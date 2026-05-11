@@ -23,7 +23,9 @@ class MerchantScopeMiddleware(BaseHTTPMiddleware):
         if request.url.path in PUBLIC_PATHS:
             return await call_next(request)
 
-        auth_context = await self.verifier.verify_authorization(request.headers.get("authorization"))
+        auth_context = await self.verifier.verify_authorization(
+            request.headers.get("authorization")
+        )
         request.state.merchant_id = auth_context.merchant_id
         request.state.clerk_user_id = auth_context.clerk_user_id
         request.state.auth_claims = auth_context.claims

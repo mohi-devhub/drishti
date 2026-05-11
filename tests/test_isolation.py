@@ -25,10 +25,7 @@ TENANT_TABLES = {
 
 
 def migration_sql() -> str:
-    return "\n".join(
-        path.read_text()
-        for path in sorted(Path("alembic/versions").glob("*.py"))
-    )
+    return "\n".join(path.read_text() for path in sorted(Path("alembic/versions").glob("*.py")))
 
 
 def test_all_tenant_tables_enable_rls() -> None:
@@ -37,8 +34,7 @@ def test_all_tenant_tables_enable_rls() -> None:
     missing = [
         table
         for table in TENANT_TABLES
-        if f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" not in sql
-        and f'"{table}"' not in sql
+        if f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" not in sql and f'"{table}"' not in sql
     ]
 
     assert missing == []

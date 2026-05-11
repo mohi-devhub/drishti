@@ -40,7 +40,12 @@ async def test_verifier_rejects_invalid_token() -> None:
 async def test_verifier_extracts_merchant_id_from_valid_token() -> None:
     merchant_id = UUID("00000000-0000-0000-0000-00000000000a")
     token = jwt.encode(
-        {"sub": "user_123", "merchant_id": str(merchant_id), "iss": "https://issuer.test", "aud": "drishti"},
+        {
+            "sub": "user_123",
+            "merchant_id": str(merchant_id),
+            "iss": "https://issuer.test",
+            "aud": "drishti",
+        },
         TEST_SECRET,
         algorithm="HS256",
     )
