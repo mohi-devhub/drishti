@@ -8,8 +8,14 @@ branch_labels = None
 depends_on = None
 
 
+def execute_statements(sql: str) -> None:
+    for statement in (part.strip() for part in sql.split(";")):
+        if statement:
+            op.execute(statement)
+
+
 def upgrade() -> None:
-    op.execute(
+    execute_statements(
         """
         CREATE TABLE connections (
             merchant_id uuid NOT NULL REFERENCES merchants(id),

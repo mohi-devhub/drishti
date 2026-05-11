@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
+from uuid import uuid4
 
 from alembic import context
 from sqlalchemy import pool
@@ -47,6 +48,10 @@ async def run_async_migrations() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__drishti_{uuid4()}__",
+        },
     )
 
     async with connectable.connect() as connection:

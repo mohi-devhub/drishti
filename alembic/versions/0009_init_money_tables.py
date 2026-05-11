@@ -15,8 +15,14 @@ CREATE POLICY merchant_isolation ON {table}
 """
 
 
+def execute_statements(sql: str) -> None:
+    for statement in (part.strip() for part in sql.split(";")):
+        if statement:
+            op.execute(statement)
+
+
 def upgrade() -> None:
-    op.execute(
+    execute_statements(
         """
         CREATE TABLE payments (
             merchant_id uuid NOT NULL REFERENCES merchants(id),
@@ -88,7 +94,7 @@ def upgrade() -> None:
         """
     )
     for table in ("payments", "refunds", "settlements"):
-        op.execute(RLS.format(table=table))
+        execute_statements(RLS.format(table=table))
 
 
 def downgrade() -> None:

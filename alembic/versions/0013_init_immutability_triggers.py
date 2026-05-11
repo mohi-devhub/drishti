@@ -19,10 +19,18 @@ def upgrade() -> None:
             RAISE EXCEPTION 'source_records are append-only';
         END;
         $$;
+        """
+    )
+    op.execute(
+        """
 
         CREATE TRIGGER source_records_no_update
             BEFORE UPDATE ON source_records
             FOR EACH ROW EXECUTE FUNCTION reject_source_record_mutation();
+        """
+    )
+    op.execute(
+        """
 
         CREATE TRIGGER source_records_no_delete
             BEFORE DELETE ON source_records

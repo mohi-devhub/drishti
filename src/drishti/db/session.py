@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -13,7 +13,14 @@ from drishti.config import Settings
 
 
 def create_engine(settings: Settings) -> AsyncEngine:
-    return create_async_engine(settings.database_url, pool_pre_ping=True)
+    return create_async_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__drishti_{uuid4()}__",
+        },
+    )
 
 
 def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:

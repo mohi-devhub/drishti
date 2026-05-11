@@ -8,10 +8,16 @@ branch_labels = None
 depends_on = None
 
 
+def execute_statements(sql: str) -> None:
+    for statement in (part.strip() for part in sql.split(";")):
+        if statement:
+            op.execute(statement)
+
+
 def upgrade() -> None:
-    op.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
-    op.execute(
+    execute_statements(
         """
+        CREATE EXTENSION IF NOT EXISTS "pgcrypto";
         CREATE TABLE merchants (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             clerk_org_id text UNIQUE NOT NULL,
