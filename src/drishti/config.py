@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     clerk_secret_key: str | None = Field(default=None, alias="CLERK_SECRET_KEY")
     clerk_jwt_issuer: str | None = Field(default=None, alias="CLERK_JWT_ISSUER")
     clerk_jwt_audience: str | None = Field(default=None, alias="CLERK_JWT_AUDIENCE")
+    test_jwt_secret: str | None = Field(default=None, alias="DRISHTI_TEST_JWT_SECRET")
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_chat_model: str = Field(default="gpt-5.2", alias="OPENAI_CHAT_MODEL")

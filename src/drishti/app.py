@@ -5,9 +5,13 @@ import logfire
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from drishti.auth.clerk import ClerkJWTVerifier
+from drishti.auth.middleware import MerchantScopeMiddleware
 from drishti.config import get_settings
+from drishti.db.session import create_engine, create_sessionmaker
 from drishti.observability import configure_observability
 from drishti.routes.health import router as health_router
+from drishti.routes.merchants import router as merchants_router
 
 
 @asynccontextmanager
@@ -15,6 +19,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.settings = settings
     yield
+    if hasattr(app.state, "db_engine"):
+        await app.state.db_engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -29,9 +35,19 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    engine = create_engine(settings)
+    sessionmaker = create_sessionmaker(engine)
+    app.state.db_engine = engine
+    app.state.db_sessionmaker = sessionmaker
+    app.add_middleware(
+        MerchantScopeMiddleware,
+        verifier=ClerkJWTVerifier(settings),
+        sessionmaker=sessionmaker,
+    )
 
     logfire.instrument_fastapi(app)
     app.include_router(health_router)
+    app.include_router(merchants_router)
     return app
 
 
