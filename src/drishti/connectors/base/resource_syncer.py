@@ -32,6 +32,7 @@ class SyncLoopResult:
     cursor_after: Cursor | None
     records_fetched: int
     api_calls: int
+    follow_up_jobs: list[tuple[str, Cursor]]
 
 
 class ResourceSyncer(ABC):
@@ -62,6 +63,9 @@ class ResourceSyncer(ABC):
         sync_run_id: UUID,
     ) -> UUID: ...
 
+    def follow_up_sync_jobs(self, raw: RawRecord) -> list[tuple[str, Cursor]]:
+        return []
+
     async def sync_raw_page_loop(
         self,
         session: AsyncSession,
@@ -74,6 +78,7 @@ class ResourceSyncer(ABC):
         current_cursor = cursor
         page_count = 0
         api_calls = 0
+        follow_up_jobs: list[tuple[str, Cursor]] = []
 
         while True:
             page = await self.fetch_page(current_cursor)
@@ -94,6 +99,7 @@ class ResourceSyncer(ABC):
                         sync_run_id=sync_run_id,
                     )
                 )
+                follow_up_jobs.extend(self.follow_up_sync_jobs(raw))
             current_cursor = self.cursor_from(page)
             if not page.has_more or current_cursor is None or page_count >= max_pages:
                 break
@@ -103,6 +109,7 @@ class ResourceSyncer(ABC):
             cursor_after=current_cursor,
             records_fetched=len(raw_record_ids),
             api_calls=api_calls,
+            follow_up_jobs=follow_up_jobs,
         )
 
 
