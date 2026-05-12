@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+async def create_session(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    clerk_user_id: str,
+    title: str | None = None,
+) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO chat_sessions (merchant_id, clerk_user_id, title, created_at, updated_at)
+            VALUES (:merchant_id, :clerk_user_id, :title, now(), now())
+            RETURNING id
+            """
+        ),
+        {
+            "merchant_id": str(merchant_id),
+            "clerk_user_id": clerk_user_id,
+            "title": title,
+        },
+    )
+    return result.scalar_one()
+
+
+async def insert_message(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    session_id: UUID,
+    role: str,
+    content: str,
+    tool_call_id: UUID | None = None,
+) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO chat_messages (
+                merchant_id, session_id, role, content, tool_call_id, created_at
+            )
+            VALUES (
+                :merchant_id, :session_id, :role, :content, :tool_call_id, now()
+            )
+            RETURNING id
+            """
+        ),
+        {
+            "merchant_id": str(merchant_id),
+            "session_id": str(session_id),
+            "role": role,
+            "content": content,
+            "tool_call_id": str(tool_call_id) if tool_call_id else None,
+        },
+    )
+    await session.execute(
+        text(
+            """
+            UPDATE chat_sessions
+            SET updated_at = now()
+            WHERE merchant_id = :merchant_id
+              AND id = :session_id
+            """
+        ),
+        {"merchant_id": str(merchant_id), "session_id": str(session_id)},
+    )
+    return result.scalar_one()
+
+
+async def create_tool_call(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    caller: str,
+    caller_id: UUID | None,
+    tool_name: str,
+    args: dict[str, Any],
+    result: dict[str, Any] | None = None,
+    result_id: str | None = None,
+    validation_status: str = "pending",
+    validation_failures: list[dict[str, Any]] | None = None,
+    started_at: datetime | None = None,
+    finished_at: datetime | None = None,
+) -> UUID:
+    started = started_at or datetime.now(UTC)
+    finished = finished_at or datetime.now(UTC)
+    latency_ms = int((finished - started).total_seconds() * 1000)
+    db_result = await session.execute(
+        text(
+            """
+            INSERT INTO tool_calls (
+                merchant_id, caller, caller_id, tool_name, args, result, result_id,
+                validation_status, validation_failures, latency_ms, started_at, finished_at,
+                created_at
+            )
+            VALUES (
+                :merchant_id, :caller, :caller_id, :tool_name, CAST(:args AS jsonb),
+                CAST(:result AS jsonb), :result_id, :validation_status,
+                CAST(:validation_failures AS jsonb), :latency_ms, :started_at, :finished_at,
+                now()
+            )
+            RETURNING id
+            """
+        ),
+        {
+            "merchant_id": str(merchant_id),
+            "caller": caller,
+            "caller_id": str(caller_id) if caller_id else None,
+            "tool_name": tool_name,
+            "args": json.dumps(args, sort_keys=True, default=str),
+            "result": json.dumps(result, sort_keys=True, default=str) if result is not None else None,
+            "result_id": result_id,
+            "validation_status": validation_status,
+            "validation_failures": json.dumps(validation_failures or [], sort_keys=True, default=str),
+            "latency_ms": latency_ms,
+            "started_at": started,
+            "finished_at": finished,
+        },
+    )
+    return db_result.scalar_one()

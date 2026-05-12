@@ -10,6 +10,7 @@ from drishti.auth.middleware import MerchantScopeMiddleware
 from drishti.config import get_settings
 from drishti.db.session import create_engine, create_sessionmaker
 from drishti.observability import configure_observability
+from drishti.routes.chat import router as chat_router
 from drishti.routes.health import router as health_router
 from drishti.routes.merchants import router as merchants_router
 
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     logfire.instrument_fastapi(app)
     app.include_router(health_router)
     app.include_router(merchants_router)
+    app.include_router(chat_router)
     return app
 
 
