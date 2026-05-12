@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {
+      "count": 100,
+      "skip": 0
+    },
+    "path": "/v1/refunds"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "items": [
+        {
+          "amount": 49900,
+          "created_at": 1778647800,
+          "id": "rfnd_demo_1001",
+          "notes": {
+            "reason": "size exchange"
+          },
+          "payment_id": "pay_demo_1001",
+          "status": "processed"
+        }
+      ]
+    },
+    "status_code": 200
+  }
+}

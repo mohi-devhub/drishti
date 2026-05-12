@@ -1,0 +1,27 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {
+      "count": 100,
+      "skip": 0
+    },
+    "path": "/v1/settlements"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "items": [
+        {
+          "amount": 199967,
+          "created_at": 1778734200,
+          "fees": 4833,
+          "id": "setl_demo_20260513",
+          "status": "processed",
+          "tax": 737,
+          "utr": "UTRDEMO20260513"
+        }
+      ]
+    },
+    "status_code": 200
+  }
+}
