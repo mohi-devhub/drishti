@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 
 from drishti.db.repositories import connections
-from drishti.workers.sync_worker import sync_shopify_orders
+from drishti.workers.sync_worker import sync_razorpay_payments, sync_shiprocket_shipments, sync_shopify_orders
 
 
 MERCHANT_ID = UUID("00000000-0000-0000-0000-00000000000a")
@@ -34,6 +34,8 @@ class FakeSession:
 
 def test_worker_entrypoint_names_are_resource_specific() -> None:
     assert sync_shopify_orders.__name__ == "sync_shopify_orders"
+    assert sync_shiprocket_shipments.__name__ == "sync_shiprocket_shipments"
+    assert sync_razorpay_payments.__name__ == "sync_razorpay_payments"
 
 
 @pytest.mark.asyncio
