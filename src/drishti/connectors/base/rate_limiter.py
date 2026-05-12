@@ -71,13 +71,12 @@ return wait_ms
         while True:
             wait_ms = await self.redis.eval(
                 self._SCRIPT,
-                keys=[key],
-                args=[
-                    int(time.time() * 1000),
-                    config.requests_per_second,
-                    config.burst,
-                    ttl_ms,
-                ],
+                1,
+                key,
+                str(int(time.time() * 1000)),
+                str(config.requests_per_second),
+                str(config.burst),
+                str(ttl_ms),
             )
             if int(wait_ms) <= 0:
                 return

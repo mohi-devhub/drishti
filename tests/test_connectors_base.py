@@ -12,6 +12,7 @@ from drishti.connectors.base import (
     MockTransport,
     NoopRateLimiter,
     RateLimitConfig,
+    RedisRateLimiter,
 )
 
 
@@ -96,3 +97,24 @@ async def test_connector_request_acquires_rate_limit_before_transport(tmp_path: 
 
     assert response.json() == {"ok": True}
     assert limiter.buckets == [f"{MERCHANT_ID}:fake"]
+
+
+class FakeRedis:
+    def __init__(self) -> None:
+        self.calls = []
+
+    async def eval(self, script, numkeys, *keys_and_args):
+        self.calls.append((script, numkeys, keys_and_args))
+        return 0
+
+
+@pytest.mark.asyncio
+async def test_redis_rate_limiter_uses_arq_eval_signature() -> None:
+    redis = FakeRedis()
+    limiter = RedisRateLimiter(redis)
+
+    await limiter.acquire("merchant:shopify", RateLimitConfig(requests_per_second=1.5, burst=10))
+
+    _, numkeys, keys_and_args = redis.calls[0]
+    assert numkeys == 1
+    assert keys_and_args[0] == "drishti:rate:merchant:shopify"
