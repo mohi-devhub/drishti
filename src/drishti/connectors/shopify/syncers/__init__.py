@@ -1,2 +1,1 @@
 """Shopify resource syncers."""
-

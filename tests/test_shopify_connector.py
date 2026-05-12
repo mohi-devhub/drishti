@@ -59,4 +59,3 @@ async def test_shopify_customers_and_products_normalize_money_fields() -> None:
     assert product["sku"] == "KURTA-BLUE-M"
     assert product["price_paise"] == 99900
     assert product["weight_grams"] == 350
-

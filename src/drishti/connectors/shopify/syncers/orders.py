@@ -168,4 +168,3 @@ async def _replace_line_items(
                 "extras": json.dumps(item, sort_keys=True, default=str),
             },
         )
-

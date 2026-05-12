@@ -180,7 +180,10 @@ class RecordingTransport:
         digest = hashlib.sha256(
             json.dumps(payload["request"], sort_keys=True).encode("utf-8")
         ).hexdigest()[:12]
-        target = self.fixture_dir / f"{method.lower()}_{parsed.path.strip('/').replace('/', '_')}_{digest}.json"
+        target = (
+            self.fixture_dir
+            / f"{method.lower()}_{parsed.path.strip('/').replace('/', '_')}_{digest}.json"
+        )
         with target.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
@@ -203,4 +206,3 @@ def _json_or_text(response: TransportResponse) -> Any:
 
 def _normalize_params(params: dict[str, Any]) -> dict[str, str]:
     return {str(key): str(value) for key, value in params.items() if value is not None}
-

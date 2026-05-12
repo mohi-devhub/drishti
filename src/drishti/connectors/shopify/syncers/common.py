@@ -94,4 +94,3 @@ def first_present(*values: Any) -> Any:
         if value not in (None, ""):
             return value
     return None
-

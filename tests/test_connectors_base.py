@@ -96,4 +96,3 @@ async def test_connector_request_acquires_rate_limit_before_transport(tmp_path: 
 
     assert response.json() == {"ok": True}
     assert limiter.buckets == [f"{MERCHANT_ID}:fake"]
-

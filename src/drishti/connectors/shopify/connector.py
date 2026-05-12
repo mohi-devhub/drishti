@@ -64,4 +64,3 @@ class ShopifyConnector(Connector):
 
             return ShopifyProductsSyncer(self)
         raise UnsupportedResource(f"Shopify does not support resource {resource!r}")
-

@@ -117,4 +117,3 @@ class Connector(ABC):
             raise TransientError(f"{self.source} transient HTTP {response.status_code}")
         if response.status_code >= 400:
             raise PermanentError(f"{self.source} permanent HTTP {response.status_code}")
-

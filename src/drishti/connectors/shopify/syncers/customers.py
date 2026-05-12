@@ -56,4 +56,3 @@ class ShopifyCustomersSyncer(ShopifyResourceSyncer):
             sync_run_id=sync_run_id,
             values=normalized,
         )
-

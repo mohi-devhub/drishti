@@ -27,4 +27,3 @@ class PermanentError(ConnectorError):
 
 class UnsupportedResource(ConnectorError):
     """The connector does not implement the requested resource."""
-
