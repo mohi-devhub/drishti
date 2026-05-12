@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from drishti.auth.clerk import ClerkJWTVerifier
 from drishti.config import Settings
+from drishti.db.session import set_merchant_context
 
 TEST_SECRET = "test-secret-with-at-least-thirty-two-bytes"
 
@@ -18,6 +19,14 @@ def verifier() -> ClerkJWTVerifier:
             CLERK_JWT_AUDIENCE="drishti",
         )
     )
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.calls = []
+
+    async def execute(self, statement, params):
+        self.calls.append((str(statement), params))
 
 
 @pytest.mark.asyncio
@@ -54,3 +63,15 @@ async def test_verifier_extracts_merchant_id_from_valid_token() -> None:
 
     assert context.merchant_id == merchant_id
     assert context.clerk_user_id == "user_123"
+
+
+@pytest.mark.asyncio
+async def test_set_merchant_context_uses_parameter_safe_set_config() -> None:
+    merchant_id = UUID("00000000-0000-0000-0000-00000000000a")
+    session = FakeSession()
+
+    await set_merchant_context(session, merchant_id)
+
+    sql, params = session.calls[0]
+    assert "set_config('app.current_merchant_id', :merchant_id, true)" in sql
+    assert params == {"merchant_id": str(merchant_id)}

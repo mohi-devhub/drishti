@@ -29,7 +29,7 @@ def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
 
 async def set_merchant_context(session: AsyncSession, merchant_id: UUID) -> None:
     await session.execute(
-        text("SET LOCAL app.current_merchant_id = :merchant_id"),
+        text("SELECT set_config('app.current_merchant_id', :merchant_id, true)"),
         {"merchant_id": str(merchant_id)},
     )
 
