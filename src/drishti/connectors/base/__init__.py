@@ -9,7 +9,12 @@ from drishti.connectors.base.errors import (
     TransientError,
     UnsupportedResource,
 )
-from drishti.connectors.base.rate_limiter import NoopRateLimiter, RateLimitConfig, RedisRateLimiter
+from drishti.connectors.base.rate_limiter import (
+    NoopRateLimiter,
+    RateLimitConfig,
+    RateLimiter,
+    RedisRateLimiter,
+)
 from drishti.connectors.base.resource_syncer import Page, ResourceSyncer
 from drishti.connectors.base.transport import (
     LiveTransport,
@@ -30,6 +35,7 @@ __all__ = [
     "Page",
     "PermanentError",
     "RateLimitConfig",
+    "RateLimiter",
     "RateLimitError",
     "RecordingTransport",
     "RedisRateLimiter",
@@ -39,4 +45,3 @@ __all__ = [
     "TransportResponse",
     "UnsupportedResource",
 ]
-

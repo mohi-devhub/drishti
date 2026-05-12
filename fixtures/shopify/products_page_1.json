@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {
+      "limit": 250
+    },
+    "path": "/admin/api/2026-01/products.json"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "products": [
+        {
+          "handle": "blue-cotton-kurta",
+          "id": 7001,
+          "product_type": "Apparel",
+          "title": "Blue Cotton Kurta",
+          "variants": [
+            {
+              "grams": 350,
+              "id": 8001,
+              "price": "999.00",
+              "sku": "KURTA-BLUE-M"
+            }
+          ],
+          "vendor": "Drishti Demo"
+        }
+      ]
+    },
+    "status_code": 200
+  }
+}
+

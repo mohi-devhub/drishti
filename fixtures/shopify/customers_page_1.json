@@ -1,0 +1,31 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {
+      "limit": 250
+    },
+    "path": "/admin/api/2026-01/customers.json"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "customers": [
+        {
+          "created_at": "2026-05-01T10:00:00+05:30",
+          "currency": "INR",
+          "email": "customer001@example.test",
+          "first_name": "Asha",
+          "id": 111,
+          "last_name": "Sharma",
+          "phone": "+919999000001",
+          "state": "enabled",
+          "tags": "demo",
+          "total_spent": "2048.00",
+          "updated_at": "2026-05-12T08:20:00+05:30"
+        }
+      ]
+    },
+    "status_code": 200
+  }
+}
+

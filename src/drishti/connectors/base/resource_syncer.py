@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -128,7 +129,7 @@ async def upsert_domain_row(
         "updated_at",
     ]
     insert_names = ", ".join(columns)
-    placeholders = ", ".join(f":{column}" for column in columns)
+    placeholders = ", ".join(_placeholder(column) for column in columns)
     update_columns = [
         "raw_record_id",
         "sync_run_id",
@@ -143,7 +144,7 @@ async def upsert_domain_row(
         "source_record_id": source_record_id,
         "raw_record_id": str(raw_record_id),
         "sync_run_id": str(sync_run_id),
-        **values,
+        **{key: _serialize_param(value) for key, value in values.items()},
         "synced_at": datetime.now(UTC),
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
@@ -162,3 +163,14 @@ async def upsert_domain_row(
     )
     return result.scalar_one()
 
+
+def _placeholder(column: str) -> str:
+    if column == "extras":
+        return f"CAST(:{column} AS jsonb)"
+    return f":{column}"
+
+
+def _serialize_param(value: Any) -> Any:
+    if isinstance(value, dict | list):
+        return json.dumps(value, sort_keys=True, default=str)
+    return value

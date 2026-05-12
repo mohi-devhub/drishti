@@ -1,0 +1,57 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {
+      "limit": 250,
+      "status": "any"
+    },
+    "path": "/admin/api/2026-01/orders.json"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "orders": [
+        {
+          "created_at": "2026-05-12T08:15:00+05:30",
+          "currency": "INR",
+          "financial_status": "paid",
+          "fulfillment_status": null,
+          "gateway": "Cash on Delivery (COD)",
+          "id": 5234567890123,
+          "line_items": [
+            {
+              "id": 9001,
+              "price": "999.00",
+              "product_id": 7001,
+              "quantity": 2,
+              "sku": "KURTA-BLUE-M",
+              "title": "Blue Cotton Kurta"
+            }
+          ],
+          "name": "#1001",
+          "order_number": 1001,
+          "payment_gateway_names": [
+            "Cash on Delivery (COD)"
+          ],
+          "shipping_address": {
+            "country_code": "IN",
+            "zip": "110001"
+          },
+          "subtotal_price": "1998.00",
+          "tags": "demo,sanitized",
+          "total_discounts": "0.00",
+          "total_price": "2048.00",
+          "total_shipping_price_set": {
+            "shop_money": {
+              "amount": "50.00",
+              "currency_code": "INR"
+            }
+          },
+          "total_tax": "0.00"
+        }
+      ]
+    },
+    "status_code": 200
+  }
+}
+
