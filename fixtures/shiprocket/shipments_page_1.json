@@ -1,0 +1,46 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {
+      "page": 1
+    },
+    "path": "/v1/external/shipments"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "shipments": [
+        {
+          "awb_code": "AWB123456789",
+          "courier_id": "10",
+          "courier_name": "Delhivery Surface",
+          "current_status": "Delivered",
+          "customer_pincode": "110001",
+          "delivered_at": "2026-05-12T18:30:00+05:30",
+          "expected_delivery_at": "2026-05-13T18:30:00+05:30",
+          "freight_charges": "82.50",
+          "id": 91001,
+          "order_id": "#1001",
+          "pickup_pincode": "560001",
+          "weight": "0.45"
+        },
+        {
+          "awb_code": "AWB987654321",
+          "courier_id": "11",
+          "courier_name": "Xpressbees",
+          "current_status": "RTO Initiated",
+          "customer_pincode": "110045",
+          "expected_delivery_at": "2026-05-13T18:30:00+05:30",
+          "freight_charges": "126.00",
+          "id": 91002,
+          "order_id": "#1002",
+          "pickup_pincode": "560001",
+          "rto_initiated_at": "2026-05-14T15:00:00+05:30",
+          "weight": "0.60"
+        }
+      ],
+      "total_pages": 1
+    },
+    "status_code": 200
+  }
+}

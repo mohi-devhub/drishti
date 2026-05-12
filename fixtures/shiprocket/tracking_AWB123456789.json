@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "GET",
+    "params": {},
+    "path": "/v1/external/courier/track/awb/AWB123456789"
+  },
+  "response": {
+    "headers": {},
+    "json": {
+      "tracking_data": {
+        "shipment_track_activities": [
+          {
+            "activity": "Shipment picked up",
+            "date": "2026-05-12T10:30:00+05:30",
+            "location": "Bangalore",
+            "status": "Picked Up"
+          },
+          {
+            "activity": "Delivered to customer",
+            "date": "2026-05-12T18:30:00+05:30",
+            "location": "Delhi",
+            "status": "Delivered"
+          }
+        ]
+      }
+    },
+    "status_code": 200
+  }
+}
