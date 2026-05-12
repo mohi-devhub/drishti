@@ -2,8 +2,13 @@ from arq.connections import RedisSettings
 
 from drishti.config import get_settings
 from drishti.db.session import create_engine, create_sessionmaker
-from drishti.workers.normalize_worker import normalize_shopify
+from drishti.workers.normalize_worker import normalize_razorpay, normalize_shiprocket, normalize_shopify
 from drishti.workers.sync_worker import (
+    sync_razorpay_payments,
+    sync_razorpay_refunds,
+    sync_razorpay_settlements,
+    sync_shiprocket_shipments,
+    sync_shiprocket_tracking,
     sync_shopify_customers,
     sync_shopify_orders,
     sync_shopify_products,
@@ -38,7 +43,14 @@ class WorkerSettings:
         sync_shopify_orders,
         sync_shopify_customers,
         sync_shopify_products,
+        sync_shiprocket_shipments,
+        sync_shiprocket_tracking,
+        sync_razorpay_payments,
+        sync_razorpay_refunds,
+        sync_razorpay_settlements,
         normalize_shopify,
+        normalize_shiprocket,
+        normalize_razorpay,
     ]
     on_startup = startup
     on_shutdown = shutdown

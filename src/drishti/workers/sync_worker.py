@@ -27,6 +27,36 @@ async def sync_shopify_products(
     return await sync_resource(ctx, merchant_id, "shopify", "products", cursor=cursor)
 
 
+async def sync_shiprocket_shipments(
+    ctx: dict[str, Any], merchant_id: str, cursor: dict | None = None
+) -> dict:
+    return await sync_resource(ctx, merchant_id, "shiprocket", "shipments", cursor=cursor)
+
+
+async def sync_shiprocket_tracking(
+    ctx: dict[str, Any], merchant_id: str, cursor: dict | None = None
+) -> dict:
+    return await sync_resource(ctx, merchant_id, "shiprocket", "tracking", cursor=cursor)
+
+
+async def sync_razorpay_payments(
+    ctx: dict[str, Any], merchant_id: str, cursor: dict | None = None
+) -> dict:
+    return await sync_resource(ctx, merchant_id, "razorpay", "payments", cursor=cursor)
+
+
+async def sync_razorpay_refunds(
+    ctx: dict[str, Any], merchant_id: str, cursor: dict | None = None
+) -> dict:
+    return await sync_resource(ctx, merchant_id, "razorpay", "refunds", cursor=cursor)
+
+
+async def sync_razorpay_settlements(
+    ctx: dict[str, Any], merchant_id: str, cursor: dict | None = None
+) -> dict:
+    return await sync_resource(ctx, merchant_id, "razorpay", "settlements", cursor=cursor)
+
+
 async def sync_resource(
     ctx: dict[str, Any],
     merchant_id: str,
@@ -105,9 +135,16 @@ async def sync_resource(
 
     for raw_record_id in result.raw_record_ids:
         await ctx["redis"].enqueue_job(f"normalize_{source}", merchant_id, str(raw_record_id))
+    for follow_up_resource, follow_up_cursor in result.follow_up_jobs:
+        await ctx["redis"].enqueue_job(
+            f"sync_{source}_{follow_up_resource}",
+            merchant_id,
+            follow_up_cursor,
+        )
 
     return {
         "sync_run_id": str(sync_run_id),
         "records_fetched": result.records_fetched,
         "api_calls": result.api_calls,
+        "follow_up_jobs": len(result.follow_up_jobs),
     }

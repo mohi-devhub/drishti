@@ -13,6 +13,14 @@ async def normalize_shopify(ctx: dict[str, Any], merchant_id: str, source_record
     return await normalize_source_record(ctx, merchant_id, "shopify", source_record_id)
 
 
+async def normalize_shiprocket(ctx: dict[str, Any], merchant_id: str, source_record_id: str) -> dict:
+    return await normalize_source_record(ctx, merchant_id, "shiprocket", source_record_id)
+
+
+async def normalize_razorpay(ctx: dict[str, Any], merchant_id: str, source_record_id: str) -> dict:
+    return await normalize_source_record(ctx, merchant_id, "razorpay", source_record_id)
+
+
 async def normalize_source_record(
     ctx: dict[str, Any],
     merchant_id: str,

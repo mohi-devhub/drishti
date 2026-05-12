@@ -14,10 +14,14 @@ from drishti.connectors.base import (
     Transport,
     UnsupportedResource,
 )
+from drishti.connectors.razorpay import RazorpayConnector
+from drishti.connectors.shiprocket import ShiprocketConnector
 from drishti.connectors.shopify import ShopifyConnector
 
 
 CONNECTOR_REGISTRY = {
+    "razorpay": RazorpayConnector,
+    "shiprocket": ShiprocketConnector,
     "shopify": ShopifyConnector,
 }
 
