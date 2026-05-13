@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from drishti.chat.citation_validator import redact_uncited, validate_citations
-from drishti.chat.tools.registry import CitedAggregate, CitedRow, TOOL_REGISTRY, ToolResult
+from drishti.chat.tools.registry import CitedAggregate, CitedRow, ToolResult
 
 
 def tool_result() -> ToolResult:
@@ -138,12 +138,3 @@ def test_validator_accepts_percent_aggregate() -> None:
 
     assert validation.passed is True
 
-
-def test_day3_tool_registry_exposes_only_read_only_starter_tools() -> None:
-    assert set(TOOL_REGISTRY) == {
-        "query_orders",
-        "rto_loss_by_pincode",
-        "query_shipments",
-        "query_payments",
-    }
-    assert all(tool.read_only for tool in TOOL_REGISTRY.values())

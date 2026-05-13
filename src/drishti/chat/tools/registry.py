@@ -275,6 +275,249 @@ async def query_rto_loss_by_pincode(
     )
 
 
+async def courier_margin_by_route(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    limit: int = 20,
+) -> ToolResult:
+    result = await session.execute(
+        text(
+            """
+            SELECT
+              LEFT(pickup_pincode, 3) || '_' || LEFT(delivery_pincode, 3) AS route,
+              courier_id,
+              courier_name,
+              COUNT(*) AS shipment_count,
+              COALESCE(SUM(freight_paise), 0) AS freight_total_paise,
+              AVG(freight_paise::numeric / NULLIF(weight_grams, 0)) AS freight_per_g
+            FROM shipments
+            WHERE merchant_id = :merchant_id
+              AND weight_grams > 0
+              AND freight_paise IS NOT NULL
+            GROUP BY 1, 2, 3
+            ORDER BY freight_total_paise DESC
+            LIMIT :limit
+            """
+        ),
+        {"merchant_id": str(merchant_id), "limit": limit},
+    )
+    rows = [
+        _derived_row(
+            row_id=f"courier_route:{row['courier_id']}:{row['route']}",
+            values=dict(row),
+            fetched_from="shipments GROUP BY route,courier",
+        )
+        for row in result.mappings().all()
+    ]
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="courier_margin_by_route",
+        args={"limit": limit},
+        rows=rows,
+        aggregates=[
+            CitedAggregate(
+                agg_id="agg_courier_routes_count",
+                label="courier_routes_count",
+                value=len(rows),
+                unit="count",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="COUNT(route,courier groups)",
+            )
+        ],
+    )
+
+
+async def delayed_prepaid_orders(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    limit: int = 50,
+) -> ToolResult:
+    result = await session.execute(
+        text(
+            """
+            SELECT s.id AS shipment_id, o.id AS order_id, p.id AS payment_id,
+                   s.awb_code, s.courier_name, s.expected_delivery_at,
+                   EXTRACT(day FROM now() - s.expected_delivery_at)::int AS days_overdue,
+                   o.total_paise
+            FROM shipments s
+            JOIN order_links ol ON ol.shipment_id = s.id
+              AND ol.merchant_id = s.merchant_id
+              AND ol.confidence >= 0.8
+            JOIN orders o ON o.id = ol.order_id AND o.merchant_id = ol.merchant_id
+            JOIN payments p ON p.id = ol.payment_id AND p.merchant_id = ol.merchant_id
+            WHERE s.merchant_id = :merchant_id
+              AND s.status NOT IN ('delivered', 'cancelled', 'rto_delivered', 'lost')
+              AND s.expected_delivery_at < now() - interval '2 days'
+              AND p.status = 'captured'
+            ORDER BY days_overdue DESC
+            LIMIT :limit
+            """
+        ),
+        {"merchant_id": str(merchant_id), "limit": limit},
+    )
+    rows = [
+        _derived_row(
+            row_id=f"delayed_prepaid:{row['shipment_id']}",
+            values=dict(row),
+            fetched_from="shipments JOIN orders JOIN payments",
+        )
+        for row in result.mappings().all()
+    ]
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="delayed_prepaid_orders",
+        args={"limit": limit},
+        rows=rows,
+        aggregates=[
+            CitedAggregate(
+                agg_id="agg_delayed_prepaid_count",
+                label="delayed_prepaid_count",
+                value=len(rows),
+                unit="count",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="COUNT(delayed prepaid shipments)",
+            )
+        ],
+    )
+
+
+async def refund_shipping_mismatch_check(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    limit: int = 50,
+) -> ToolResult:
+    result = await session.execute(
+        text(
+            """
+            SELECT r.id AS refund_id, o.id AS order_id, s.id AS shipment_id,
+                   r.amount_paise AS refund_amount_paise,
+                   COALESCE(s.freight_paise, 0) AS freight_paise,
+                   r.amount_paise + COALESCE(s.freight_paise, 0) AS exposure_paise
+            FROM refunds r
+            JOIN payments p ON p.id = r.payment_id AND p.merchant_id = r.merchant_id
+            JOIN order_links ol ON ol.payment_id = p.id
+              AND ol.merchant_id = p.merchant_id
+              AND ol.confidence >= 0.8
+            JOIN orders o ON o.id = ol.order_id AND o.merchant_id = ol.merchant_id
+            JOIN shipments s ON s.id = ol.shipment_id AND s.merchant_id = ol.merchant_id
+            WHERE r.merchant_id = :merchant_id
+              AND s.picked_up_at IS NOT NULL
+              AND r.processed_at IS NOT NULL
+              AND s.picked_up_at < r.processed_at
+              AND s.status NOT IN ('rto_delivered', 'rto_initiated', 'rto_in_transit')
+            ORDER BY exposure_paise DESC
+            LIMIT :limit
+            """
+        ),
+        {"merchant_id": str(merchant_id), "limit": limit},
+    )
+    rows = [
+        _derived_row(
+            row_id=f"refund_shipping:{row['refund_id']}",
+            values=dict(row),
+            fetched_from="refunds JOIN payments JOIN orders JOIN shipments",
+        )
+        for row in result.mappings().all()
+    ]
+    exposure = sum(int(row.values.get("exposure_paise") or 0) for row in rows)
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="refund_shipping_mismatch_check",
+        args={"limit": limit},
+        rows=rows,
+        aggregates=[
+            CitedAggregate(
+                agg_id="agg_refund_shipping_exposure_paise",
+                label="refund_shipping_exposure_paise",
+                value=exposure,
+                unit="inr_paise",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="SUM(refund.amount_paise + shipment.freight_paise)",
+            )
+        ],
+    )
+
+
+async def list_findings(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    limit: int = 50,
+) -> ToolResult:
+    result = await session.execute(
+        text(
+            """
+            SELECT id, duty, finding_type, severity, confidence,
+                   estimated_saving_inr_low, estimated_saving_inr_high, narrative_status
+            FROM agent_findings
+            WHERE merchant_id = :merchant_id
+            ORDER BY created_at DESC
+            LIMIT :limit
+            """
+        ),
+        {"merchant_id": str(merchant_id), "limit": limit},
+    )
+    rows = [
+        _derived_row(
+            row_id=f"finding:{row['id']}",
+            values=dict(row),
+            fetched_from="agent_findings",
+        )
+        for row in result.mappings().all()
+    ]
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="list_findings",
+        args={"limit": limit},
+        rows=rows,
+        aggregates=[
+            CitedAggregate(
+                agg_id="agg_findings_count",
+                label="findings_count",
+                value=len(rows),
+                unit="count",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="COUNT(agent_findings)",
+            )
+        ],
+    )
+
+
+async def get_finding(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    finding_id: UUID,
+) -> ToolResult:
+    result = await session.execute(
+        text(
+            """
+            SELECT id, duty, finding_type, severity, confidence,
+                   estimated_saving_inr_low, estimated_saving_inr_high,
+                   narrative, narrative_status, proposed_action, citations
+            FROM agent_findings
+            WHERE merchant_id = :merchant_id
+              AND id = :finding_id
+            """
+        ),
+        {"merchant_id": str(merchant_id), "finding_id": str(finding_id)},
+    )
+    row = result.mappings().one_or_none()
+    rows = [
+        _derived_row(row_id=f"finding:{row['id']}", values=dict(row), fetched_from="agent_findings")
+    ] if row else []
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="get_finding",
+        args={"finding_id": str(finding_id)},
+        rows=rows,
+        aggregates=[],
+    )
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "query_orders": ToolDefinition(
         name="query_orders",
@@ -295,6 +538,31 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         name="query_payments",
         handler=query_payments,
         description="Filter merchant payments and return cited payment rows plus payment aggregates.",
+    ),
+    "courier_margin_by_route": ToolDefinition(
+        name="courier_margin_by_route",
+        handler=courier_margin_by_route,
+        description="Group freight cost by route and courier.",
+    ),
+    "delayed_prepaid_orders": ToolDefinition(
+        name="delayed_prepaid_orders",
+        handler=delayed_prepaid_orders,
+        description="Find prepaid shipments past expected delivery.",
+    ),
+    "refund_shipping_mismatch_check": ToolDefinition(
+        name="refund_shipping_mismatch_check",
+        handler=refund_shipping_mismatch_check,
+        description="Find refunds issued after shipment pickup.",
+    ),
+    "list_findings": ToolDefinition(
+        name="list_findings",
+        handler=list_findings,
+        description="List agent findings for the current merchant.",
+    ),
+    "get_finding": ToolDefinition(
+        name="get_finding",
+        handler=get_finding,
+        description="Get one agent finding.",
     ),
 }
 
@@ -359,6 +627,18 @@ def _payment_row(row: Any) -> CitedRow:
     )
 
 
+def _derived_row(*, row_id: str, values: dict[str, Any], fetched_from: str) -> CitedRow:
+    return CitedRow(
+        row_id=row_id,
+        values={key: _json_safe(value) for key, value in values.items()},
+        source="derived",
+        source_record_id=row_id,
+        raw_record_id="",
+        fetched_from=fetched_from,
+        synced_at=datetime.now().isoformat(),
+    )
+
+
 def _result_id() -> str:
     return f"tr_{uuid4().hex[:12]}"
 
@@ -369,3 +649,9 @@ def _iso(value: Any) -> str:
 
 def _date_args(**kwargs: Any) -> dict[str, Any]:
     return {key: value.isoformat() if hasattr(value, "isoformat") else value for key, value in kwargs.items()}
+
+
+def _json_safe(value: Any) -> Any:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value
