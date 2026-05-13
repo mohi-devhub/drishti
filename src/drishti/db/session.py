@@ -17,6 +17,7 @@ def create_engine(settings: Settings) -> AsyncEngine:
         settings.database_url,
         pool_pre_ping=True,
         connect_args={
+            "prepared_statement_cache_size": 0,
             "statement_cache_size": 0,
             "prepared_statement_name_func": lambda: f"__drishti_{uuid4()}__",
         },
