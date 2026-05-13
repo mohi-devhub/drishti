@@ -4,13 +4,20 @@ import base64
 import hashlib
 import hmac
 
+import pytest
+
 from drishti.agents.rto_shipping_margin.agent import build_agent
 from drishti.agents.rto_shipping_margin.duties.common import finding_tool_result
 from drishti.agents.rto_shipping_margin.narrator import narrate
 from drishti.agents.base import Finding
 from drishti.chat.tools.registry import TOOL_REGISTRY
 from drishti.webhooks.shopify import resource_from_topic, verify_hmac
-from drishti.workers.agent_worker import agent_daily_run, run_rto_shipping_margin_agent
+from drishti.worker import WorkerSettings
+from drishti.workers.agent_worker import (
+    agent_daily_run,
+    enqueue_daily_agent_runs,
+    run_rto_shipping_margin_agent,
+)
 
 
 def test_agent_has_four_day4_duties() -> None:
@@ -27,6 +34,11 @@ def test_agent_has_four_day4_duties() -> None:
 def test_agent_worker_entrypoints_are_named() -> None:
     assert run_rto_shipping_margin_agent.__name__ == "run_rto_shipping_margin_agent"
     assert agent_daily_run.__name__ == "agent_daily_run"
+    assert enqueue_daily_agent_runs.__name__ == "enqueue_daily_agent_runs"
+
+
+def test_worker_settings_declares_agent_cron() -> None:
+    assert any(job.name == "enqueue_daily_agent_runs" for job in WorkerSettings.cron_jobs)
 
 
 def test_day4_chat_tools_are_read_only() -> None:
@@ -63,7 +75,8 @@ def test_shopify_topic_maps_to_resource() -> None:
     assert resource_from_topic("products/create") == "products"
 
 
-def test_agent_narration_validates_savings_citations() -> None:
+@pytest.mark.asyncio
+async def test_agent_narration_validates_savings_citations() -> None:
     tool_result = finding_tool_result(
         tool_name="test_duty",
         row_id="finding:test",
@@ -83,7 +96,7 @@ def test_agent_narration_validates_savings_citations() -> None:
         tool_result=tool_result,
     )
 
-    narrative, status, _ = narrate(finding)
+    narrative, status, _ = await narrate(finding)
 
     assert status == "validated"
     assert "₹1,200" in narrative
