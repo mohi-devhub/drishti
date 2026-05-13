@@ -15,4 +15,9 @@ async def run_rto_shipping_margin_agent(
     merchant_id=Depends(get_current_merchant_id),
 ) -> dict:
     session: AsyncSession = request.state.db
-    return await run_worker(session, merchant_id=merchant_id, trigger="manual")
+    return await run_worker(
+        session,
+        merchant_id=merchant_id,
+        trigger="manual",
+        settings=request.app.state.settings,
+    )

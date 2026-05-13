@@ -13,6 +13,7 @@ from drishti.agents.rto_shipping_margin.duties import (
     RefundShippingMismatchDuty,
 )
 from drishti.agents.rto_shipping_margin.narrator import narrate
+from drishti.config import Settings
 from drishti.db.repositories import agent_runs
 
 
@@ -32,6 +33,7 @@ async def run_worker(
     *,
     merchant_id: UUID,
     trigger: str = "manual",
+    settings: Settings | None = None,
 ) -> dict:
     snapshot = await input_snapshot(session, merchant_id=merchant_id)
     run_id = await agent_runs.create(
@@ -43,7 +45,7 @@ async def run_worker(
     result = await build_agent().detect(session)
     finding_ids = []
     for finding in result.findings:
-        narrative, narrative_status, citations = narrate(finding)
+        narrative, narrative_status, citations = await narrate(finding, settings=settings)
         finding_ids.append(
             await agent_runs.insert_finding(
                 session,
