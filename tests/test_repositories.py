@@ -3,7 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from drishti.db.repositories import chat, order_links, source_records, sync_runs
+from drishti.db.repositories import agent_runs, chat, order_links, source_records, sync_runs
 
 MERCHANT_A = UUID("00000000-0000-0000-0000-00000000000a")
 RAW_ID = UUID("10000000-0000-0000-0000-000000000001")
@@ -176,3 +176,60 @@ async def test_tool_call_repository_serializes_result_and_validation_state() -> 
     assert params["merchant_id"] == str(MERCHANT_A)
     assert params["result_id"] == "tr_abc"
     assert params["validation_status"] == "passed"
+
+
+@pytest.mark.asyncio
+async def test_agent_run_repository_writes_are_merchant_scoped() -> None:
+    run_id = UUID("80000000-0000-0000-0000-000000000001")
+    session = FakeSession(run_id)
+
+    await agent_runs.create(
+        session,
+        merchant_id=MERCHANT_A,
+        trigger="manual",
+        input_snapshot={"orders": {"row_count": 1}},
+    )
+    await agent_runs.finish(
+        session,
+        merchant_id=MERCHANT_A,
+        run_id=run_id,
+        status="completed",
+        duties_run=["cod_rto_risk"],
+        duties_skipped=[],
+        findings_count=0,
+    )
+
+    create_sql, create_params = session.calls[0]
+    finish_sql, finish_params = session.calls[1]
+    assert "INSERT INTO agent_runs" in create_sql
+    assert create_params["merchant_id"] == str(MERCHANT_A)
+    assert "WHERE merchant_id = :merchant_id" in finish_sql
+    assert "AND id = :run_id" in finish_sql
+    assert finish_params["merchant_id"] == str(MERCHANT_A)
+
+
+@pytest.mark.asyncio
+async def test_agent_finding_repository_writes_are_merchant_scoped() -> None:
+    session = FakeSession(UUID("90000000-0000-0000-0000-000000000001"))
+
+    await agent_runs.insert_finding(
+        session,
+        merchant_id=MERCHANT_A,
+        run_id=UUID("80000000-0000-0000-0000-000000000001"),
+        duty="cod_rto_risk",
+        finding_type="cod_rto_pincode_cluster",
+        severity="medium",
+        confidence=0.9,
+        evidence_row_ids=["order:1"],
+        estimated_saving_inr_low=1000,
+        estimated_saving_inr_high=1200,
+        narrative="narrative",
+        narrative_status="validated",
+        proposed_action={"action_type": "review"},
+        citations={},
+    )
+
+    sql, params = session.calls[0]
+    assert "INSERT INTO agent_findings" in sql
+    assert params["merchant_id"] == str(MERCHANT_A)
+    assert params["evidence_row_ids"] == ["order:1"]
