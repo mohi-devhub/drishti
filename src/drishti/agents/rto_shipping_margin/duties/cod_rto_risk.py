@@ -44,8 +44,9 @@ class CodRtoRiskDuty:
         )
         findings = []
         for row in result.mappings().all():
-            low = int((row["freight_loss_paise"] or 0) * 1.4 / 100)
-            high = int((row["freight_loss_paise"] or 0) * 1.6 / 100)
+            freight_loss_paise = int(row["freight_loss_paise"] or 0)
+            low = freight_loss_paise * 14 // 1000
+            high = freight_loss_paise * 16 // 1000
             evidence = list(row["evidence_row_ids"] or [])
             tool_result = finding_tool_result(
                 tool_name=self.name,
