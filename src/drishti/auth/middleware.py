@@ -6,7 +6,7 @@ from drishti.auth.clerk import ClerkJWTVerifier
 from drishti.db.session import set_merchant_context
 
 PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
-PUBLIC_PREFIXES = ("/webhooks/shopify/",)
+PUBLIC_PREFIXES = ("/webhooks/shopify/", "/demo/token/")
 
 
 class MerchantScopeMiddleware(BaseHTTPMiddleware):
@@ -21,7 +21,11 @@ class MerchantScopeMiddleware(BaseHTTPMiddleware):
         self.sessionmaker = sessionmaker
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if request.url.path in PUBLIC_PATHS or request.url.path.startswith(PUBLIC_PREFIXES):
+        if (
+            request.method == "OPTIONS"
+            or request.url.path in PUBLIC_PATHS
+            or request.url.path.startswith(PUBLIC_PREFIXES)
+        ):
             return await call_next(request)
 
         auth_context = await self.verifier.verify_authorization(
