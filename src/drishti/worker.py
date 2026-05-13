@@ -2,6 +2,7 @@ from arq.connections import RedisSettings
 
 from drishti.config import get_settings
 from drishti.db.session import create_engine, create_sessionmaker
+from drishti.workers.agent_worker import agent_daily_run, run_rto_shipping_margin_agent
 from drishti.workers.normalize_worker import normalize_razorpay, normalize_shiprocket, normalize_shopify
 from drishti.workers.sync_worker import (
     sync_razorpay_payments,
@@ -51,6 +52,8 @@ class WorkerSettings:
         normalize_shopify,
         normalize_shiprocket,
         normalize_razorpay,
+        run_rto_shipping_margin_agent,
+        agent_daily_run,
     ]
     on_startup = startup
     on_shutdown = shutdown
