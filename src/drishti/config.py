@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     logfire_service_name: str = Field(default="drishti-api", alias="LOGFIRE_SERVICE_NAME")
 
     transport_mode: str = Field(default="mock", alias="DRISHTI_TRANSPORT")
+    shopify_webhook_secret: str | None = Field(default=None, alias="SHOPIFY_WEBHOOK_SECRET")
 
 
 @lru_cache
