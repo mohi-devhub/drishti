@@ -1,59 +1,48 @@
-const connectors = ["Shopify", "Shiprocket", "Razorpay"];
+import Link from "next/link";
+import { LandingBeamGraphic } from "./landing-beam-graphic";
 
-export default function Home() {
+export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-zinc-50 text-zinc-950">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-between px-6 py-8">
-        <header className="flex items-center justify-between border-b border-zinc-200 pb-4">
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Drishti</p>
-            <h1 className="text-2xl font-semibold tracking-normal">Ops workspace</h1>
-          </div>
-          <span className="rounded-md border border-zinc-300 px-3 py-1 text-sm text-zinc-600">
-            Day 0
+    <main className="min-h-screen overflow-hidden text-white">
+      <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-8">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="grid size-11 place-items-center rounded-md bg-white text-sm font-semibold text-black">D</span>
+          <span>
+            <span className="block text-base font-semibold leading-5 text-white">Drishti</span>
+            <span className="block text-sm leading-5 text-white/45">AI ops analyst</span>
           </span>
-        </header>
+        </Link>
+        <nav className="flex items-center gap-3">
+          <Link className="flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black hover:bg-emerald-100" href="/dashboard">
+            Open dashboard
+          </Link>
+        </nav>
+      </header>
 
-        <div className="grid gap-6 py-12 md:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6">
-            <div>
-              <h2 className="max-w-3xl text-4xl font-semibold tracking-normal">
-                Cited commerce, shipping, and payment intelligence for D2C ops.
-              </h2>
-              <p className="mt-4 max-w-2xl text-lg leading-8 text-zinc-600">
-                The app shell is ready for the chat, findings, and merchant isolation flows
-                described in the build plan.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              {connectors.map((source) => (
-                <div key={source} className="rounded-md border border-zinc-200 bg-white p-4">
-                  <p className="text-sm font-medium text-zinc-500">Connector</p>
-                  <p className="mt-2 text-lg font-semibold">{source}</p>
-                </div>
-              ))}
-            </div>
+      <section className="mx-auto grid min-h-[calc(100vh-112px)] max-w-7xl items-center gap-12 px-5 pb-14 lg:grid-cols-[0.88fr_1.12fr]">
+        <div className="max-w-4xl">
+          <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.38em] text-white/45">
+            <span className="size-2 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.9)]" />
+            D2C Ops Intelligence
           </div>
-
-          <aside className="rounded-md border border-zinc-200 bg-white p-5">
-            <h3 className="text-base font-semibold">Local services</h3>
-            <dl className="mt-4 space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-zinc-500">FastAPI</dt>
-                <dd className="font-medium">:8000</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-zinc-500">Next.js</dt>
-                <dd className="font-medium">:3000</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-zinc-500">Worker</dt>
-                <dd className="font-medium">Arq</dd>
-              </div>
-            </dl>
-          </aside>
+          <h1 className="mt-16 text-6xl font-semibold leading-[0.96] tracking-[-0.05em] text-white md:text-8xl">
+            From scattered data
+            <span className="block text-emerald-200">to verified decisions.</span>
+          </h1>
+          <p className="mt-8 max-w-3xl text-base leading-7 text-white/58 md:text-lg md:leading-8">
+            Drishti connects Shopify, Shiprocket, and Razorpay so D2C founders can ask cross-tool questions, inspect cited answers, and review read-only agent findings with raw evidence behind every rupee.
+          </p>
+          <div className="mt-10 flex flex-wrap gap-3">
+            <Link className="flex h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold leading-none text-black shadow-[0_0_40px_rgba(255,255,255,0.16)] hover:bg-emerald-100" href="/dashboard">
+              Open dashboard
+            </Link>
+            <Link className="flex h-12 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] px-6 text-sm font-semibold leading-none text-white hover:border-emerald-200/50 hover:bg-emerald-200/10" href="/chat">
+              Ask Drishti
+            </Link>
+          </div>
         </div>
+
+        <LandingBeamGraphic />
       </section>
     </main>
   );
