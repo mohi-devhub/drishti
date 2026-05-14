@@ -64,6 +64,12 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
+input.chat-composer-input:focus,
+input.chat-composer-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 summary::-webkit-details-marker {
   display: none;
 }

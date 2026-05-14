@@ -84,9 +84,6 @@ export function useDemoAuth() {
 
 export function AppHeader({
   merchant,
-  token,
-  error,
-  authMode = "demo",
   onMerchant,
 }: {
   merchant: MerchantKey;
@@ -136,13 +133,6 @@ export function AppHeader({
               <option key={key} value={key}>{labels[key]}</option>
             ))}
           </select>
-          <div
-            className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-medium leading-none text-white/70 shadow-sm"
-            title={error || (token ? `${authMode === "clerk" ? "Clerk" : "Demo"} auth ready` : "Auth missing")}
-          >
-            <span className={`size-2 rounded-full ${token ? "bg-emerald-300" : "bg-rose-300"}`} />
-            {token ? `${authMode === "clerk" ? "Clerk" : "Demo"} auth` : "Auth missing"}
-          </div>
           <Show when="signed-out">
             <SignInButton mode="modal">
               <button className="h-11 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/80 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white">

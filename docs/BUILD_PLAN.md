@@ -8,6 +8,64 @@ The plan is written for a solo build with Claude Code / Cursor as a collaborator
 
 ---
 
+## Current finish checklist
+
+Updated: Thursday, May 14, 2026.
+
+Use this section as the source of truth for what remains before submission. The day-by-day plan below is historical planning context.
+
+### Done
+
+- [x] Core v0 backend is implemented: connector abstraction, normalized schema, provenance, cited chat, agent run log, findings API.
+- [x] Cited chat is implemented with OpenAI tool use when `OPENAI_API_KEY` is configured, plus deterministic citation validation/fallback.
+- [x] Agent is implemented and read-only: it proposes ops-saving actions and stores run logs/findings without external writes.
+- [x] Demo UI is implemented: dashboard, cited chat, findings page, evidence drill-down, proposed-action rendering.
+- [x] Clerk sign-in/sign-up and protected Next.js routes are implemented.
+- [x] Clerk JWT template `drishiti` is configured for the demo merchant UUID claim.
+- [x] Local demo merchant switcher exists for reviewer exploration.
+- [x] Scale harness exists and has a committed report.
+- [x] Supabase/Postgres integration is implemented through SQLAlchemy/asyncpg.
+- [x] Implementation commits are ready through Clerk auth and UI polish; push status should be checked before final submission.
+
+### Must finish
+
+- [ ] Push current implementation commits after final UI review.
+- [ ] Commit final `README.md` after reviewing it against the challenge rubric.
+- [ ] Run one clean final smoke test:
+  - [ ] Seed demo data.
+  - [ ] Run the agent.
+  - [ ] Ask cited chat questions for revenue, RTO loss, and evidence behind findings.
+  - [ ] Verify Findings starts empty and populates only after `Run agent`.
+  - [ ] Verify Merchant A/B/C switching clears chat/findings state and does not leak stale UI data.
+  - [ ] Verify signed-in Clerk flow reaches protected pages and backend calls use the configured JWT template.
+- [ ] Submit by replying to the email with the GitHub repo link.
+
+### Production/demo gaps to state clearly
+
+- [x] Real user auth is implemented with Clerk for the web app.
+- [x] Production tenant switching is not implemented. The visible Merchant A/B/C switcher is a demo-only affordance. In production, a merchant user should land in their own workspace and should not freely switch tenants unless they are an internal admin or belong to multiple Clerk Organizations with an explicit org-to-merchant mapping.
+- [ ] Live OAuth/setup screens for Shopify, Shiprocket, and Razorpay are not complete. The connector abstraction exists; demo uses seeded/fixture data.
+- [x] Supabase is used as Postgres via SQLAlchemy/asyncpg, so Supabase API metrics can show zero even when the database is active.
+- [x] Findings proposed actions are read-only, which matches the brief. No external action execution exists.
+
+### Nice to have
+
+- [ ] Add a small chat debug/status indicator showing `OpenAI tool loop + citation validator`.
+- [ ] Improve aggregate evidence detail to show contributing order/shipment IDs, not only the derived aggregate row.
+- [ ] Add screenshots or a short demo flow section to `README.md`.
+- [x] Add deployment notes for Railway/Vercel env vars to `README.md`.
+- [ ] Run one hosted deployment smoke if deploying publicly before submission.
+
+### Next implementation order
+
+1. Finalize the UI polish already in progress, then push `Add v0 Clerk auth` plus the small header/chat polish commit.
+2. Run the clean final smoke test from the checklist above.
+3. Update `README.md` with the smoke-test results, current auth status, demo-only merchant switcher note, deployment envs, and eval honesty.
+4. Commit `README.md` last.
+5. Push `main` and submit the repo URL.
+
+---
+
 ## Constraints driving the sequence
 
 - **Citations are the highest-risk feature.** If the validator doesn't work end-to-end, the demo collapses. Build it on Day 3 against fake data so we have time to debug.

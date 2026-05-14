@@ -128,8 +128,11 @@ function ChatWorkspace() {
           </div>
           <div className="flex-1 space-y-5 overflow-auto p-5">
             {messages.length === 0 ? (
-              <div className="grid min-h-80 place-items-center rounded-lg border border-dashed border-white/15 bg-black/25 p-6 text-center">
+              <div className="grid min-h-80 place-items-center px-6 text-center">
                 <div>
+                  <div className="mx-auto mb-5 grid size-10 place-items-center rounded-full border border-emerald-200/20 bg-emerald-200/10 text-sm font-semibold text-emerald-100">
+                    D
+                  </div>
                   <p className="text-lg font-semibold text-white">Ask a merchant ops question</p>
                   <p className="mt-3 max-w-md text-sm leading-6 text-white/48">
                     Answers include cited source rows, and the evidence panel keeps raw API lineage one click away.
@@ -174,7 +177,7 @@ function ChatWorkspace() {
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                className="h-11 min-w-0 flex-1 bg-transparent px-4 text-sm text-white outline-none placeholder:text-white/25"
+                className="chat-composer-input h-11 min-w-0 flex-1 appearance-none border-0 bg-transparent px-4 text-sm text-white outline-none ring-0 placeholder:text-white/25 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none"
                 placeholder="Ask about revenue, returns, shipments, or evidence"
               />
               <button disabled={busy || !auth.token} className="h-11 rounded-full bg-white px-6 text-sm font-semibold text-black transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/55 disabled:text-black/70">
