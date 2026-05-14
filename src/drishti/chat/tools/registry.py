@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Awaitable, Callable
 from uuid import UUID, uuid4
 
@@ -96,7 +97,9 @@ async def query_orders(
     return ToolResult(
         result_id=_result_id(),
         tool_name="query_orders",
-        args=_date_args(start_date=start_date, end_date=end_date, status=status, payment_method=payment_method),
+        args=_date_args(
+            start_date=start_date, end_date=end_date, status=status, payment_method=payment_method
+        ),
         rows=rows,
         aggregates=[
             CitedAggregate(
@@ -247,7 +250,7 @@ async def query_rto_loss_by_pincode(
         rows.append(
             CitedRow(
                 row_id=row_id,
-                values=dict(row),
+                values={key: _json_safe(value) for key, value in dict(row).items()},
                 source="derived",
                 source_record_id=str(row["pincode"]),
                 raw_record_id="",
@@ -266,12 +269,23 @@ async def query_rto_loss_by_pincode(
                 formula="SUM(shipments.freight_paise WHERE shipments.status LIKE 'rto%')",
             )
         )
+    total_loss = sum(int(aggregate.value) for aggregate in aggregates)
     return ToolResult(
         result_id=_result_id(),
         tool_name="rto_loss_by_pincode",
         args={"limit": limit},
         rows=rows,
-        aggregates=aggregates,
+        aggregates=[
+            CitedAggregate(
+                agg_id="agg_rto_loss_total_paise",
+                label="rto_loss_total_paise",
+                value=total_loss,
+                unit="inr_paise",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="SUM(shipments.freight_paise WHERE shipments.status LIKE 'rto%')",
+            ),
+            *aggregates,
+        ],
     )
 
 
@@ -310,6 +324,7 @@ async def courier_margin_by_route(
         )
         for row in result.mappings().all()
     ]
+    total_freight = sum(int(row.values.get("freight_total_paise") or 0) for row in rows)
     return ToolResult(
         result_id=_result_id(),
         tool_name="courier_margin_by_route",
@@ -317,13 +332,21 @@ async def courier_margin_by_route(
         rows=rows,
         aggregates=[
             CitedAggregate(
+                agg_id="agg_courier_freight_total_paise",
+                label="courier_freight_total_paise",
+                value=total_freight,
+                unit="inr_paise",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="SUM(shipments.freight_paise)",
+            ),
+            CitedAggregate(
                 agg_id="agg_courier_routes_count",
                 label="courier_routes_count",
                 value=len(rows),
                 unit="count",
                 derived_from_row_ids=[row.row_id for row in rows],
                 formula="COUNT(route,courier groups)",
-            )
+            ),
         ],
     )
 
@@ -430,13 +453,21 @@ async def refund_shipping_mismatch_check(
         rows=rows,
         aggregates=[
             CitedAggregate(
+                agg_id="agg_refund_shipping_count",
+                label="refund_shipping_count",
+                value=len(rows),
+                unit="count",
+                derived_from_row_ids=[row.row_id for row in rows],
+                formula="COUNT(refund-shipping mismatches)",
+            ),
+            CitedAggregate(
                 agg_id="agg_refund_shipping_exposure_paise",
                 label="refund_shipping_exposure_paise",
                 value=exposure,
                 unit="inr_paise",
                 derived_from_row_ids=[row.row_id for row in rows],
                 formula="SUM(refund.amount_paise + shipment.freight_paise)",
-            )
+            ),
         ],
     )
 
@@ -506,9 +537,15 @@ async def get_finding(
         {"merchant_id": str(merchant_id), "finding_id": str(finding_id)},
     )
     row = result.mappings().one_or_none()
-    rows = [
-        _derived_row(row_id=f"finding:{row['id']}", values=dict(row), fetched_from="agent_findings")
-    ] if row else []
+    rows = (
+        [
+            _derived_row(
+                row_id=f"finding:{row['id']}", values=dict(row), fetched_from="agent_findings"
+            )
+        ]
+        if row
+        else []
+    )
     return ToolResult(
         result_id=_result_id(),
         tool_name="get_finding",
@@ -648,10 +685,17 @@ def _iso(value: Any) -> str:
 
 
 def _date_args(**kwargs: Any) -> dict[str, Any]:
-    return {key: value.isoformat() if hasattr(value, "isoformat") else value for key, value in kwargs.items()}
+    return {
+        key: value.isoformat() if hasattr(value, "isoformat") else value
+        for key, value in kwargs.items()
+    }
 
 
 def _json_safe(value: Any) -> Any:
     if hasattr(value, "isoformat"):
         return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return float(value)
     return value
