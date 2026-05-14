@@ -11,6 +11,8 @@ from jwt import PyJWKClient
 
 from drishti.config import Settings
 
+LOCAL_DEMO_JWT_SECRET = "local-demo-secret-with-at-least-thirty-two-bytes"
+
 
 @dataclass(frozen=True)
 class AuthContext:
@@ -24,6 +26,8 @@ class ClerkJWTVerifier:
         self._issuer = settings.clerk_jwt_issuer
         self._audience = settings.clerk_jwt_audience
         self._test_secret = settings.test_jwt_secret
+        if settings.environment == "local" and not self._test_secret:
+            self._test_secret = LOCAL_DEMO_JWT_SECRET
         self._jwk_client: PyJWKClient | None = None
         if self._issuer:
             jwks_url = f"{self._issuer.rstrip('/')}/.well-known/jwks.json"

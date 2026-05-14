@@ -34,9 +34,17 @@ def create_app() -> FastAPI:
     configure_observability(settings)
     app = FastAPI(title="Drishti API", version="0.1.0", lifespan=lifespan)
 
+    cors_origins = {str(settings.web_origin).rstrip("/")}
+    cors_origins.update(
+        origin.strip().rstrip("/")
+        for origin in settings.extra_cors_origins.split(",")
+        if origin.strip()
+    )
+    if settings.environment == "local":
+        cors_origins.update({"http://localhost:3000", "http://localhost:3001"})
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(settings.web_origin).rstrip("/")],
+        allow_origins=sorted(cors_origins),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

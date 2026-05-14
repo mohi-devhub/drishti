@@ -1,4 +1,5 @@
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -28,9 +29,16 @@ class MerchantScopeMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
-        auth_context = await self.verifier.verify_authorization(
-            request.headers.get("authorization")
-        )
+        try:
+            auth_context = await self.verifier.verify_authorization(
+                request.headers.get("authorization")
+            )
+        except HTTPException as exc:
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+                headers=exc.headers,
+            )
         request.state.merchant_id = auth_context.merchant_id
         request.state.clerk_user_id = auth_context.clerk_user_id
         request.state.auth_claims = auth_context.claims

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", alias="DRISHTI_API_HOST")
     api_port: int = Field(default=8000, alias="DRISHTI_API_PORT")
     web_origin: AnyHttpUrl = Field(default="http://localhost:3000", alias="DRISHTI_WEB_ORIGIN")
+    extra_cors_origins: str = Field(default="", alias="DRISHTI_EXTRA_CORS_ORIGINS")
 
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/drishti",
