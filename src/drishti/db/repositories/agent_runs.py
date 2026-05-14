@@ -148,6 +148,53 @@ async def list_findings(
     return [dict(row) for row in result.mappings().all()]
 
 
+async def latest_run(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+) -> dict[str, Any] | None:
+    result = await session.execute(
+        text(
+            """
+            SELECT *
+            FROM agent_runs
+            WHERE merchant_id = :merchant_id
+              AND agent_name = 'rto_shipping_margin_worker'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        ),
+        {"merchant_id": str(merchant_id)},
+    )
+    row = result.mappings().one_or_none()
+    return dict(row) if row else None
+
+
+async def list_latest_findings(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    limit: int = 50,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    run = await latest_run(session, merchant_id=merchant_id)
+    if run is None:
+        return None, []
+    result = await session.execute(
+        text(
+            """
+            SELECT *
+            FROM agent_findings
+            WHERE merchant_id = :merchant_id
+              AND run_id = :run_id
+            ORDER BY created_at DESC
+            LIMIT :limit
+            """
+        ),
+        {"merchant_id": str(merchant_id), "run_id": str(run["id"]), "limit": limit},
+    )
+    return run, [dict(row) for row in result.mappings().all()]
+
+
 async def get_finding(
     session: AsyncSession,
     *,

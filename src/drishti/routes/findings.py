@@ -18,8 +18,11 @@ async def list_agent_findings(
     limit: int = 50,
 ) -> dict:
     session: AsyncSession = request.state.db
-    rows = await agent_runs.list_findings(session, merchant_id=merchant_id, limit=limit)
-    return {"findings": [_serialize(row) for row in rows]}
+    run, rows = await agent_runs.list_latest_findings(session, merchant_id=merchant_id, limit=limit)
+    return {
+        "run": _serialize_run(run) if run else None,
+        "findings": [_serialize(row) for row in rows],
+    }
 
 
 @router.get("/{finding_id}")
@@ -50,5 +53,17 @@ def _serialize(row: dict) -> dict:
         "narrative_status": row["narrative_status"],
         "proposed_action": row["proposed_action"],
         "citations": row["citations"],
+        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+    }
+
+
+def _serialize_run(row: dict) -> dict:
+    return {
+        "id": str(row["id"]),
+        "trigger": row["trigger"],
+        "status": row["status"],
+        "findings_count": row["findings_count"],
+        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
+        "finished_at": row["finished_at"].isoformat() if row["finished_at"] else None,
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
     }
