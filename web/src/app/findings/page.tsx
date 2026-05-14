@@ -106,6 +106,7 @@ export default function FindingsPage() {
         merchant={auth.merchant}
         token={auth.token}
         error={auth.error}
+        authMode={auth.authMode}
         onMerchant={switchMerchant}
       />
       <section className="mx-auto grid max-w-7xl gap-5 px-5 py-6">

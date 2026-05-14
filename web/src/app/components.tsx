@@ -1,5 +1,6 @@
 "use client";
 
+import { Show, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -17,10 +18,14 @@ export function apiBase() {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
+type AuthMode = "clerk" | "demo";
+
 export function useDemoAuth() {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [merchant, setMerchant] = useState<MerchantKey>("merchant_c");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const [authMode, setAuthMode] = useState<AuthMode>("demo");
 
   const setManualToken = useCallback((value: string) => {
     setToken(value);
@@ -29,45 +34,65 @@ export function useDemoAuth() {
 
   const refresh = useCallback(async (nextMerchant: MerchantKey = "merchant_c") => {
     setError("");
+    setMerchant(nextMerchant);
+    localStorage.setItem("drishti.merchant", nextMerchant);
+
+    if (isLoaded && isSignedIn) {
+      const template = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || undefined;
+      const clerkToken = await getToken(template ? { template } : undefined);
+      setAuthMode("clerk");
+      if (clerkToken) {
+        setToken(clerkToken);
+        localStorage.removeItem("drishti.token");
+        return;
+      }
+      setToken("");
+      setError("Clerk session did not return a backend token. Check the Clerk JWT template.");
+      return;
+    }
+
     try {
       const response = await fetch(`${apiBase()}/demo/token/${nextMerchant}`);
       if (!response.ok) throw new Error(await response.text());
       const payload = await response.json();
-      setMerchant(nextMerchant);
       setToken(payload.token);
-      localStorage.setItem("drishti.merchant", nextMerchant);
+      setAuthMode("demo");
       localStorage.setItem("drishti.token", payload.token);
     } catch {
       const stored = localStorage.getItem("drishti.token");
       if (stored) {
         setToken(stored);
+        setAuthMode("demo");
         setError("");
       } else {
         setError("Demo auth unavailable. Check the local API and DRISHTI_TEST_JWT_SECRET.");
       }
     }
-  }, []);
+  }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
+    if (!isLoaded) return undefined;
     const storedMerchant = (localStorage.getItem("drishti.merchant") as MerchantKey | null) || "merchant_c";
     const timer = window.setTimeout(() => {
       void refresh(storedMerchant);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [refresh]);
+  }, [isLoaded, refresh]);
 
-  return { merchant, token, error, setToken: setManualToken, refresh, labels };
+  return { merchant, token, error, authMode, setToken: setManualToken, refresh, labels };
 }
 
 export function AppHeader({
   merchant,
   token,
   error,
+  authMode = "demo",
   onMerchant,
 }: {
   merchant: MerchantKey;
   token: string;
   error: string;
+  authMode?: AuthMode;
   onMerchant: (merchant: MerchantKey) => void;
 }) {
   const pathname = usePathname();
@@ -113,11 +138,28 @@ export function AppHeader({
           </select>
           <div
             className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-medium leading-none text-white/70 shadow-sm"
-            title={error || (token ? "Demo auth ready" : "Demo auth missing")}
+            title={error || (token ? `${authMode === "clerk" ? "Clerk" : "Demo"} auth ready` : "Auth missing")}
           >
             <span className={`size-2 rounded-full ${token ? "bg-emerald-300" : "bg-rose-300"}`} />
-            {token ? "Demo auth" : "Auth missing"}
+            {token ? `${authMode === "clerk" ? "Clerk" : "Demo"} auth` : "Auth missing"}
           </div>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="h-11 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/80 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white">
+                Sign in
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-emerald-100">
+                Sign up
+              </button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <div className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
+              <UserButton />
+            </div>
+          </Show>
         </div>
       </div>
     </header>

@@ -104,6 +104,7 @@ function ChatWorkspace() {
         merchant={auth.merchant}
         token={auth.token}
         error={auth.error}
+        authMode={auth.authMode}
         onMerchant={switchMerchant}
       />
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 xl:grid-cols-[minmax(0,1fr)_430px]">

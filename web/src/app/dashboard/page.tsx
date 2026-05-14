@@ -87,6 +87,7 @@ export default function DashboardPage() {
         merchant={auth.merchant}
         token={auth.token}
         error={auth.error}
+        authMode={auth.authMode}
         onMerchant={auth.refresh}
       />
 
