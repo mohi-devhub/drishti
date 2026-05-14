@@ -23,9 +23,9 @@ class MerchantSeed:
 
 
 MERCHANTS = [
-    MerchantSeed("merchant_a", UUID("00000000-0000-0000-0000-00000000000a"), "Merchant A", 6),
-    MerchantSeed("merchant_b", UUID("00000000-0000-0000-0000-00000000000b"), "Merchant B", 18),
-    MerchantSeed("merchant_c", UUID("00000000-0000-0000-0000-00000000000c"), "Merchant C", 12),
+    MerchantSeed("merchant_a", UUID("00000000-0000-0000-0000-00000000000a"), "Merchant A", 50),
+    MerchantSeed("merchant_b", UUID("00000000-0000-0000-0000-00000000000b"), "Merchant B", 500),
+    MerchantSeed("merchant_c", UUID("00000000-0000-0000-0000-00000000000c"), "Merchant C", 800),
 ]
 
 
@@ -71,6 +71,7 @@ async def seed_merchant(conn, seed: MerchantSeed) -> None:
 
     if seed.key == "merchant_c":
         await seed_cod_rto_cluster(conn, seed)
+        await seed_courier_margin_drift(conn, seed)
         await seed_delayed_prepaid(conn, seed)
         await seed_refund_shipping_mismatch(conn, seed)
 
@@ -137,11 +138,73 @@ async def seed_cod_rto_cluster(conn, seed: MerchantSeed) -> None:
         shipment_raw_id = _uuid("a6", seed, index)
         order_source_id = f"{seed.key}-rto-order-{index}"
         shipment_source_id = f"{seed.key}-rto-shipment-{index}"
-        await insert_source_record(conn, seed=seed, raw_id=order_raw_id, source="shopify", resource="orders", source_record_id=order_source_id, payload={"id": order_source_id})
-        await insert_source_record(conn, seed=seed, raw_id=shipment_raw_id, source="shiprocket", resource="shipments", source_record_id=shipment_source_id, payload={"id": shipment_source_id})
-        await upsert_order(conn, seed, order_id, order_source_id, order_raw_id, "cod", 45000, "110001")
-        await upsert_shipment(conn, seed, shipment_id, shipment_source_id, shipment_raw_id, "rto_initiated", 25000, "110001", picked_up_days=6)
+        await insert_source_record(
+            conn,
+            seed=seed,
+            raw_id=order_raw_id,
+            source="shopify",
+            resource="orders",
+            source_record_id=order_source_id,
+            payload={"id": order_source_id},
+        )
+        await insert_source_record(
+            conn,
+            seed=seed,
+            raw_id=shipment_raw_id,
+            source="shiprocket",
+            resource="shipments",
+            source_record_id=shipment_source_id,
+            payload={"id": shipment_source_id},
+        )
+        await upsert_order(
+            conn, seed, order_id, order_source_id, order_raw_id, "cod", 45000, "110001"
+        )
+        await upsert_shipment(
+            conn,
+            seed,
+            shipment_id,
+            shipment_source_id,
+            shipment_raw_id,
+            "rto_initiated",
+            25000,
+            "110001",
+            picked_up_days=6,
+        )
         await upsert_link(conn, seed, link_id, order_id, shipment_id, None)
+
+
+async def seed_courier_margin_drift(conn, seed: MerchantSeed) -> None:
+    for offset, courier_id, courier_name, freight_paise in [
+        *[(index, "xb", "Xpressbees", 32000) for index in range(201, 207)],
+        *[(index, "dl", "Delhivery", 12000) for index in range(207, 213)],
+    ]:
+        shipment_id = _uuid("b7", seed, offset)
+        raw_id = _uuid("b8", seed, offset)
+        source_id = f"{seed.key}-courier-margin-shipment-{offset}"
+        await insert_source_record(
+            conn,
+            seed=seed,
+            raw_id=raw_id,
+            source="shiprocket",
+            resource="shipments",
+            source_record_id=source_id,
+            payload={"id": source_id, "courier": courier_name, "freight": freight_paise},
+        )
+        await upsert_shipment(
+            conn,
+            seed,
+            shipment_id,
+            source_id,
+            raw_id,
+            "delivered",
+            freight_paise,
+            "110001",
+            picked_up_days=3,
+            courier_id=courier_id,
+            courier_name=courier_name,
+            pickup_pincode="560001",
+            weight_grams=500,
+        )
 
 
 async def seed_delayed_prepaid(conn, seed: MerchantSeed) -> None:
@@ -149,12 +212,57 @@ async def seed_delayed_prepaid(conn, seed: MerchantSeed) -> None:
     shipment_id = _uuid("a8", seed, 1)
     payment_id = _uuid("a9", seed, 1)
     link_id = _uuid("aa", seed, 1)
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("ab", seed, 1), source="shopify", resource="orders", source_record_id="merchant_c-delayed-order", payload={})
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("ac", seed, 1), source="shiprocket", resource="shipments", source_record_id="merchant_c-delayed-shipment", payload={})
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("ad", seed, 1), source="razorpay", resource="payments", source_record_id="merchant_c-delayed-payment", payload={})
-    await upsert_order(conn, seed, order_id, "merchant_c-delayed-order", _uuid("ab", seed, 1), "prepaid", 175000, "400001")
-    await upsert_shipment(conn, seed, shipment_id, "merchant_c-delayed-shipment", _uuid("ac", seed, 1), "in_transit", 14000, "400001", picked_up_days=7)
-    await upsert_payment(conn, seed, payment_id, "merchant_c-delayed-payment", _uuid("ad", seed, 1), 175000)
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("ab", seed, 1),
+        source="shopify",
+        resource="orders",
+        source_record_id="merchant_c-delayed-order",
+        payload={},
+    )
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("ac", seed, 1),
+        source="shiprocket",
+        resource="shipments",
+        source_record_id="merchant_c-delayed-shipment",
+        payload={},
+    )
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("ad", seed, 1),
+        source="razorpay",
+        resource="payments",
+        source_record_id="merchant_c-delayed-payment",
+        payload={},
+    )
+    await upsert_order(
+        conn,
+        seed,
+        order_id,
+        "merchant_c-delayed-order",
+        _uuid("ab", seed, 1),
+        "prepaid",
+        175000,
+        "400001",
+    )
+    await upsert_shipment(
+        conn,
+        seed,
+        shipment_id,
+        "merchant_c-delayed-shipment",
+        _uuid("ac", seed, 1),
+        "in_transit",
+        14000,
+        "400001",
+        picked_up_days=7,
+    )
+    await upsert_payment(
+        conn, seed, payment_id, "merchant_c-delayed-payment", _uuid("ad", seed, 1), 175000
+    )
     await upsert_link(conn, seed, link_id, order_id, shipment_id, payment_id)
 
 
@@ -164,13 +272,66 @@ async def seed_refund_shipping_mismatch(conn, seed: MerchantSeed) -> None:
     payment_id = _uuid("b0", seed, 1)
     refund_id = _uuid("b1", seed, 1)
     link_id = _uuid("b2", seed, 1)
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("b3", seed, 1), source="shopify", resource="orders", source_record_id="merchant_c-refund-order", payload={})
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("b4", seed, 1), source="shiprocket", resource="shipments", source_record_id="merchant_c-refund-shipment", payload={})
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("b5", seed, 1), source="razorpay", resource="payments", source_record_id="merchant_c-refund-payment", payload={})
-    await insert_source_record(conn, seed=seed, raw_id=_uuid("b6", seed, 1), source="razorpay", resource="refunds", source_record_id="merchant_c-refund", payload={})
-    await upsert_order(conn, seed, order_id, "merchant_c-refund-order", _uuid("b3", seed, 1), "prepaid", 210000, "700001")
-    await upsert_shipment(conn, seed, shipment_id, "merchant_c-refund-shipment", _uuid("b4", seed, 1), "in_transit", 18000, "700001", picked_up_days=5)
-    await upsert_payment(conn, seed, payment_id, "merchant_c-refund-payment", _uuid("b5", seed, 1), 210000)
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("b3", seed, 1),
+        source="shopify",
+        resource="orders",
+        source_record_id="merchant_c-refund-order",
+        payload={},
+    )
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("b4", seed, 1),
+        source="shiprocket",
+        resource="shipments",
+        source_record_id="merchant_c-refund-shipment",
+        payload={},
+    )
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("b5", seed, 1),
+        source="razorpay",
+        resource="payments",
+        source_record_id="merchant_c-refund-payment",
+        payload={},
+    )
+    await insert_source_record(
+        conn,
+        seed=seed,
+        raw_id=_uuid("b6", seed, 1),
+        source="razorpay",
+        resource="refunds",
+        source_record_id="merchant_c-refund",
+        payload={},
+    )
+    await upsert_order(
+        conn,
+        seed,
+        order_id,
+        "merchant_c-refund-order",
+        _uuid("b3", seed, 1),
+        "prepaid",
+        210000,
+        "700001",
+    )
+    await upsert_shipment(
+        conn,
+        seed,
+        shipment_id,
+        "merchant_c-refund-shipment",
+        _uuid("b4", seed, 1),
+        "in_transit",
+        18000,
+        "700001",
+        picked_up_days=5,
+    )
+    await upsert_payment(
+        conn, seed, payment_id, "merchant_c-refund-payment", _uuid("b5", seed, 1), 210000
+    )
     await upsert_link(conn, seed, link_id, order_id, shipment_id, payment_id)
     await conn.execute(
         text(
@@ -188,11 +349,25 @@ async def seed_refund_shipping_mismatch(conn, seed: MerchantSeed) -> None:
             DO UPDATE SET processed_at = EXCLUDED.processed_at, updated_at = now()
             """
         ),
-        {"merchant_id": str(seed.merchant_id), "id": str(refund_id), "raw_id": str(_uuid("b6", seed, 1)), "payment_id": str(payment_id)},
+        {
+            "merchant_id": str(seed.merchant_id),
+            "id": str(refund_id),
+            "raw_id": str(_uuid("b6", seed, 1)),
+            "payment_id": str(payment_id),
+        },
     )
 
 
-async def insert_source_record(conn, *, seed: MerchantSeed, raw_id: UUID, source: str, resource: str, source_record_id: str, payload: dict) -> None:
+async def insert_source_record(
+    conn,
+    *,
+    seed: MerchantSeed,
+    raw_id: UUID,
+    source: str,
+    resource: str,
+    source_record_id: str,
+    payload: dict,
+) -> None:
     await conn.execute(
         text(
             """
@@ -220,7 +395,16 @@ async def insert_source_record(conn, *, seed: MerchantSeed, raw_id: UUID, source
     )
 
 
-async def upsert_order(conn, seed: MerchantSeed, order_id: UUID, source_id: str, raw_id: UUID, payment_method: str, total_paise: int, pincode: str) -> None:
+async def upsert_order(
+    conn,
+    seed: MerchantSeed,
+    order_id: UUID,
+    source_id: str,
+    raw_id: UUID,
+    payment_method: str,
+    total_paise: int,
+    pincode: str,
+) -> None:
     await conn.execute(
         text(
             """
@@ -254,7 +438,22 @@ async def upsert_order(conn, seed: MerchantSeed, order_id: UUID, source_id: str,
     )
 
 
-async def upsert_shipment(conn, seed: MerchantSeed, shipment_id: UUID, source_id: str, raw_id: UUID, status: str, freight_paise: int, pincode: str, *, picked_up_days: int) -> None:
+async def upsert_shipment(
+    conn,
+    seed: MerchantSeed,
+    shipment_id: UUID,
+    source_id: str,
+    raw_id: UUID,
+    status: str,
+    freight_paise: int,
+    pincode: str,
+    *,
+    picked_up_days: int,
+    courier_id: str = "xb",
+    courier_name: str = "Xpressbees",
+    pickup_pincode: str = "560001",
+    weight_grams: int = 500,
+) -> None:
     await conn.execute(
         text(
             """
@@ -266,8 +465,8 @@ async def upsert_shipment(conn, seed: MerchantSeed, shipment_id: UUID, source_id
             )
             VALUES (
                 :merchant_id, :id, 'shiprocket', :source_id, :raw_id, :awb,
-                'xb', 'Xpressbees', :status, :freight_paise, 500,
-                '560001', :pincode, now() - (:picked_up_days * interval '1 day'),
+                :courier_id, :courier_name, :status, :freight_paise, :weight_grams,
+                :pickup_pincode, :pincode, now() - (:picked_up_days * interval '1 day'),
                 now() - interval '3 days',
                 CASE WHEN :status LIKE 'rto%' THEN now() - interval '1 day' ELSE NULL END,
                 '{}'::jsonb, now(), now(), now()
@@ -288,11 +487,17 @@ async def upsert_shipment(conn, seed: MerchantSeed, shipment_id: UUID, source_id
             "freight_paise": freight_paise,
             "pincode": pincode,
             "picked_up_days": picked_up_days,
+            "courier_id": courier_id,
+            "courier_name": courier_name,
+            "pickup_pincode": pickup_pincode,
+            "weight_grams": weight_grams,
         },
     )
 
 
-async def upsert_payment(conn, seed: MerchantSeed, payment_id: UUID, source_id: str, raw_id: UUID, amount_paise: int) -> None:
+async def upsert_payment(
+    conn, seed: MerchantSeed, payment_id: UUID, source_id: str, raw_id: UUID, amount_paise: int
+) -> None:
     await conn.execute(
         text(
             """
@@ -310,11 +515,24 @@ async def upsert_payment(conn, seed: MerchantSeed, payment_id: UUID, source_id: 
             DO UPDATE SET amount_paise = EXCLUDED.amount_paise, updated_at = now()
             """
         ),
-        {"merchant_id": str(seed.merchant_id), "id": str(payment_id), "source_id": source_id, "raw_id": str(raw_id), "amount_paise": amount_paise},
+        {
+            "merchant_id": str(seed.merchant_id),
+            "id": str(payment_id),
+            "source_id": source_id,
+            "raw_id": str(raw_id),
+            "amount_paise": amount_paise,
+        },
     )
 
 
-async def upsert_link(conn, seed: MerchantSeed, link_id: UUID, order_id: UUID, shipment_id: UUID, payment_id: UUID | None) -> None:
+async def upsert_link(
+    conn,
+    seed: MerchantSeed,
+    link_id: UUID,
+    order_id: UUID,
+    shipment_id: UUID,
+    payment_id: UUID | None,
+) -> None:
     await conn.execute(
         text(
             """
