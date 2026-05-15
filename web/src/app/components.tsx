@@ -18,6 +18,13 @@ export function apiBase() {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
+function demoMerchantSwitcherEnabled(authMode: AuthMode) {
+  return (
+    authMode === "demo" ||
+    process.env.NEXT_PUBLIC_ENABLE_DEMO_MERCHANT_SWITCHER === "true"
+  );
+}
+
 type AuthMode = "clerk" | "demo";
 
 export function useDemoAuth() {
@@ -84,6 +91,7 @@ export function useDemoAuth() {
 
 export function AppHeader({
   merchant,
+  authMode = "demo",
   onMerchant,
 }: {
   merchant: MerchantKey;
@@ -93,6 +101,7 @@ export function AppHeader({
   onMerchant: (merchant: MerchantKey) => void;
 }) {
   const pathname = usePathname();
+  const showMerchantSwitcher = demoMerchantSwitcherEnabled(authMode);
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#050706]/85 backdrop-blur-xl">
@@ -120,19 +129,23 @@ export function AppHeader({
           </nav>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <div className="hidden h-11 items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-5 text-sm font-medium leading-none text-emerald-200 md:flex">
-            <span className="size-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.8)]" />
-            Local demo
-          </div>
-          <select
-            value={merchant}
-            onChange={(event) => onMerchant(event.target.value as MerchantKey)}
-            className="h-11 rounded-full border border-white/10 bg-white/[0.06] px-5 text-base font-medium leading-none text-white shadow-sm outline-none transition focus:border-emerald-300/50 focus:ring-2 focus:ring-emerald-300/15"
-          >
-            {(Object.keys(labels) as MerchantKey[]).map((key) => (
-              <option key={key} value={key}>{labels[key]}</option>
-            ))}
-          </select>
+          {showMerchantSwitcher ? (
+            <label className="flex h-11 items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.06] text-white shadow-sm transition focus-within:border-emerald-300/50 focus-within:ring-2 focus-within:ring-emerald-300/15">
+              <span className="ml-4 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">
+                Demo
+              </span>
+              <select
+                value={merchant}
+                onChange={(event) => onMerchant(event.target.value as MerchantKey)}
+                aria-label="Demo merchant"
+                className="h-full min-w-36 bg-transparent py-0 pl-3 pr-5 text-base font-medium leading-none text-white outline-none"
+              >
+                {(Object.keys(labels) as MerchantKey[]).map((key) => (
+                  <option key={key} value={key}>{labels[key]}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <Show when="signed-out">
             <SignInButton mode="modal">
               <button className="h-11 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/80 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white">

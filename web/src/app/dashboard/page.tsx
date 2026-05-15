@@ -17,6 +17,12 @@ type Finding = {
   created_at: string;
 };
 
+type AgentRunResponse = {
+  run_id: string;
+  status: string;
+  findings_count: number;
+};
+
 const quickQuestions = [
   "What's my total revenue this month?",
   "Which courier lanes are hurting margin?",
@@ -29,17 +35,20 @@ export default function DashboardPage() {
   const [status, setStatus] = useState("Ready");
   const [busy, setBusy] = useState(false);
 
-  const loadFindings = useCallback(async () => {
-    if (!auth.token) return;
+  const loadFindings = useCallback(async (): Promise<boolean> => {
+    if (!auth.token) return false;
     try {
       const response = await fetch(`${apiBase()}/api/findings`, { headers: authHeaders(auth.token) });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
       setFindings(payload.findings || []);
-      setStatus("Synced");
+      const latestCount = payload.run?.findings_count ?? payload.findings?.length ?? 0;
+      setStatus(payload.run ? `${latestCount} findings` : "Ready");
+      return true;
     } catch (error) {
       setStatus("API unavailable");
       console.error(error);
+      return false;
     }
   }, [auth.token]);
 
@@ -54,16 +63,32 @@ export default function DashboardPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
-      setStatus(`${payload.findings_count} findings`);
+      const completed = await pollAgentRun(payload.run_id);
+      setStatus(`${completed.findings_count} findings`);
       setBusy(false);
       void loadFindings();
     } catch (error) {
-      setStatus("Failed");
       console.error(error);
+      const loaded = await loadFindings();
+      if (!loaded) setStatus("Failed");
       setBusy(false);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function pollAgentRun(runId: string): Promise<AgentRunResponse> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/runs/${runId}`, {
+        headers: authHeaders(auth.token),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(payload));
+      if (!["queued", "running"].includes(payload.status)) return payload;
+      setStatus(payload.status === "queued" ? "Queued" : "Running");
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    }
+    throw new Error("Agent run timed out");
   }
 
   useEffect(() => {

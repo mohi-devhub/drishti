@@ -28,6 +28,12 @@ type AgentRun = {
   created_at: string | null;
 };
 
+type AgentRunResponse = {
+  run_id: string;
+  status: string;
+  findings_count: number;
+};
+
 type ProposedAction = {
   action_type?: string;
   parameters?: Record<string, unknown>;
@@ -44,8 +50,8 @@ export default function FindingsPage() {
   const [status, setStatus] = useState("Ready to run");
   const [selected, setSelected] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!auth.token) return;
+  const load = useCallback(async (): Promise<boolean> => {
+    if (!auth.token) return false;
     try {
       const response = await fetch(`${apiBase()}/api/findings`, { headers: authHeaders(auth.token) });
       const payload = await response.json();
@@ -54,8 +60,10 @@ export default function FindingsPage() {
       setRun(payload.run || null);
       setSelected((current) => current || payload.findings?.[0]?.id || null);
       setStatus(payload.run ? latestRunLabel(payload.run) : "Run completed with no findings");
+      return true;
     } catch {
       setStatus("API unavailable");
+      return false;
     }
   }, [auth.token]);
 
@@ -69,16 +77,33 @@ export default function FindingsPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
-      setStatus(`Latest run: ${payload.findings_count} findings`);
+      const completed = await pollAgentRun(payload.run_id);
+      setStatus(`Latest run: ${completed.findings_count} findings`);
       setBusy(false);
       setSelected(null);
       void load();
-    } catch {
-      setStatus("Run failed");
+    } catch (error) {
+      console.error(error);
+      const loaded = await load();
+      if (!loaded) setStatus("Run failed");
       setBusy(false);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function pollAgentRun(runId: string): Promise<AgentRunResponse> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/runs/${runId}`, {
+        headers: authHeaders(auth.token),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(payload));
+      if (!["queued", "running"].includes(payload.status)) return payload;
+      setStatus(payload.status === "queued" ? "Queued" : "Running");
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    }
+    throw new Error("Agent run timed out");
   }
 
   const switchMerchant = useCallback(
