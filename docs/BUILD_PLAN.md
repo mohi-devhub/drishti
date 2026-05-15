@@ -10,7 +10,7 @@ The plan is written for a solo build with Claude Code / Cursor as a collaborator
 
 ## Current finish checklist
 
-Updated: Thursday, May 14, 2026.
+Updated: Friday, May 15, 2026.
 
 Use this section as the source of truth for what remains before submission. The day-by-day plan below is historical planning context.
 
@@ -25,20 +25,81 @@ Use this section as the source of truth for what remains before submission. The 
 - [x] Local demo merchant switcher exists for reviewer exploration.
 - [x] Scale harness exists and has a committed report.
 - [x] Supabase/Postgres integration is implemented through SQLAlchemy/asyncpg.
-- [x] Implementation commits are ready through Clerk auth and UI polish; push status should be checked before final submission.
+- [x] Implementation commits are pushed through Clerk auth and UI polish.
+- [x] Demo seed expansion is implemented: Merchants A/B/C now get larger baseline order volumes plus RTO, delay, refund, and courier-margin scenarios, and the agent can produce findings for each merchant.
 
-### Must finish
+### Must finish for challenge submission
 
-- [ ] Push current implementation commits after final UI review.
 - [ ] Commit final `README.md` after reviewing it against the challenge rubric.
 - [ ] Run one clean final smoke test:
-  - [ ] Seed demo data.
-  - [ ] Run the agent.
-  - [ ] Ask cited chat questions for revenue, RTO loss, and evidence behind findings.
-  - [ ] Verify Findings starts empty and populates only after `Run agent`.
-  - [ ] Verify Merchant A/B/C switching clears chat/findings state and does not leak stale UI data.
-  - [ ] Verify signed-in Clerk flow reaches protected pages and backend calls use the configured JWT template.
+  - [x] Seed demo data.
+  - [x] Run the agent.
+  - [x] Ask cited chat questions for revenue, RTO loss, and evidence behind findings.
+  - [x] Verify Findings starts empty and populates only after `Run agent`.
+  - [x] Verify Merchant A/B/C switching clears chat/findings state and does not leak stale UI data.
+  - [ ] Verify signed-in Clerk flow reaches protected pages and backend calls use the configured JWT template. Protected-route redirects and token-fetch code path are verified; full signed-in browser automation still needs a Clerk testing token or manual signed-in browser check.
 - [ ] Submit by replying to the email with the GitHub repo link.
+
+### Production readiness P0
+
+These are the first items to implement before calling Drishti production-ready.
+
+- [ ] Remove the hard-coded `LOCAL_DEMO_JWT_SECRET`; require an explicit local demo secret and fail closed if absent.
+- [ ] Keep `/demo/token/*` local-only and additionally fail closed unless an explicit demo-secret flag is configured.
+- [ ] Gate HS256 demo-token verification to `DRISHTI_ENV=local`; production must use Clerk/JWKS only.
+- [ ] Resolve Shopify webhook merchant from the authenticated shop domain/connection record, not an `x-drishti-merchant-id` request header.
+- [ ] Hide or disable the merchant switcher for signed-in Clerk users; keep it only for local/demo reviewer mode.
+- [ ] Add server-side user-to-merchant membership mapping for production: Clerk user/org -> `merchant_id`, with no browser-selected tenant trust.
+- [ ] Add PII redaction or permission gating for raw source-record payloads before showing them in the browser.
+- [ ] Tighten CORS to explicit methods and headers.
+- [ ] Make `DATABASE_URL` required in non-local environments.
+- [ ] Add per-merchant rate limits for `/chat` and `/agents/.../runs`.
+- [ ] Refactor request-scoped DB transactions so reads and long OpenAI calls do not hold a transaction for the full HTTP request.
+- [ ] Move agent run execution to Arq with `run_id` polling; add server-side idempotency for duplicate run requests.
+
+### Production readiness P1
+
+- [ ] Initialize and verify the Redis/Arq pool in API lifespan so webhook enqueue paths never silently no-op.
+- [ ] Set explicit DB pool size, overflow, and timeout values.
+- [ ] Add `/health/live` and `/health/ready`; ready should verify DB, Redis, and Alembic revision.
+- [ ] Add request ID / correlation ID middleware and propagate IDs into Arq jobs.
+- [ ] Log OpenAI failures to Logfire and return a typed status such as `openai_error` when falling back.
+- [ ] Add retry/backoff around OpenAI calls.
+- [ ] Add structured JSON stdout logging fallback even when Logfire is disabled.
+- [ ] Add CI for backend tests, lint, frontend lint/typecheck, frozen lockfiles, and migration dry-run.
+- [ ] Add dependency audit checks (`pip-audit`, `pnpm audit`) before production release.
+- [ ] Add a staging deployment stanza with separate DB and Clerk instance.
+- [ ] Add Supabase backup/PITR notes and a restore drill target.
+- [ ] Add SLO targets to README: chat P95, agent run duration, ingestion lag.
+- [ ] Ignore or explicitly commit installed `.agents/skills/*`; do not leave skill directories untracked.
+
+### Demo polish P1
+
+- [ ] Replace the lower-left generic issue pill with an inline/top-of-page error message that names the failing service and has retry.
+- [ ] Tie the environment indicator to `/health`: green only when API health passes; otherwise grey/red.
+- [ ] Render unknown metrics as `-`, not `0`, when API data has not loaded or failed.
+- [ ] Add skeleton/loading states for dashboard and findings metrics.
+- [ ] Add clear CTAs in empty states: chat prompts, dashboard/finding `Run agent`.
+- [ ] Standardize currency display to `₹`, not mixed `Rs` and `₹`.
+- [ ] Add domain title casing for acronyms: COD, RTO, AWB, SLA.
+- [ ] Improve citation interaction: use subtle underline/click-to-pin evidence instead of only `title`.
+- [ ] Add accessible labels and better focus contrast for icon-only controls.
+- [ ] Respect `prefers-reduced-motion` for chat loading dots.
+- [ ] Add branded `not-found.tsx` and `error.tsx`.
+
+### Product depth P2
+
+- [ ] Add streaming/SSE chat so tool calls and partial answer states render while work is running.
+- [ ] Persist and resume chat sessions across reloads with a history/sidebar.
+- [ ] Add a collapsible "show tool calls" panel for assistant messages.
+- [ ] Improve aggregate evidence detail to show contributing order/shipment IDs, not only derived aggregate rows.
+- [ ] Add finding filters/sort/search and URL state for selected finding/current merchant/chat session.
+- [ ] Add finding lifecycle states: open, acknowledged, actioned, dismissed.
+- [ ] Add finding deduplication fingerprints across runs.
+- [ ] Add agent cancel support and per-merchant duty configuration.
+- [ ] Add copy/share/export actions for findings.
+- [ ] Add Playwright E2E tests for cited chat, run-agent flow, and merchant switching.
+- [ ] Add a real 1k-merchant load test against the staging DB.
 
 ### Production/demo gaps to state clearly
 
@@ -58,11 +119,11 @@ Use this section as the source of truth for what remains before submission. The 
 
 ### Next implementation order
 
-1. Finalize the UI polish already in progress, then push `Add v0 Clerk auth` plus the small header/chat polish commit.
-2. Run the clean final smoke test from the checklist above.
-3. Update `README.md` with the smoke-test results, current auth status, demo-only merchant switcher note, deployment envs, and eval honesty.
-4. Commit `README.md` last.
-5. Push `main` and submit the repo URL.
+1. Run the clean final smoke test from the challenge checklist.
+2. Update `README.md` with smoke-test results, current auth status, demo-only merchant switcher note, deployment envs, eval honesty, and production-readiness caveats.
+3. Commit `README.md` last.
+4. Push `main` and submit the repo URL.
+5. After submission, start production hardening from the P0 list above.
 
 ---
 
