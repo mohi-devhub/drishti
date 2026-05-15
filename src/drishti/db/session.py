@@ -13,9 +13,14 @@ from drishti.config import Settings
 
 
 def create_engine(settings: Settings) -> AsyncEngine:
+    assert settings.database_url is not None
     return create_async_engine(
         settings.database_url,
         pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout_seconds,
+        pool_recycle=settings.db_pool_recycle_seconds,
         connect_args={
             "prepared_statement_cache_size": 0,
             "statement_cache_size": 0,
@@ -30,7 +35,7 @@ def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
 
 async def set_merchant_context(session: AsyncSession, merchant_id: UUID) -> None:
     await session.execute(
-        text("SELECT set_config('app.current_merchant_id', :merchant_id, true)"),
+        text("SELECT set_config('app.current_merchant_id', :merchant_id, false)"),
         {"merchant_id": str(merchant_id)},
     )
 

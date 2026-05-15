@@ -19,7 +19,9 @@ target_metadata = None
 
 
 def get_url() -> str:
-    return get_settings().database_url
+    database_url = get_settings().database_url
+    assert database_url is not None
+    return database_url
 
 
 def run_migrations_offline() -> None:

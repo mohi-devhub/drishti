@@ -14,6 +14,8 @@ TEST_SECRET = "test-secret-with-at-least-thirty-two-bytes"
 def verifier() -> ClerkJWTVerifier:
     return ClerkJWTVerifier(
         Settings(
+            DRISHTI_ENV="local",
+            DRISHTI_ALLOW_LOCAL_DEMO_AUTH=True,
             DRISHTI_TEST_JWT_SECRET=TEST_SECRET,
             CLERK_JWT_ISSUER="https://issuer.test",
             CLERK_JWT_AUDIENCE="drishti",
@@ -73,5 +75,5 @@ async def test_set_merchant_context_uses_parameter_safe_set_config() -> None:
     await set_merchant_context(session, merchant_id)
 
     sql, params = session.calls[0]
-    assert "set_config('app.current_merchant_id', :merchant_id, true)" in sql
+    assert "set_config('app.current_merchant_id', :merchant_id, false)" in sql
     assert params == {"merchant_id": str(merchant_id)}

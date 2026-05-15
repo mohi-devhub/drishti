@@ -6,6 +6,7 @@ from drishti.config import get_settings
 
 def test_demo_token_returns_local_jwt(monkeypatch) -> None:
     monkeypatch.setenv("DRISHTI_ENV", "local")
+    monkeypatch.setenv("DRISHTI_ALLOW_LOCAL_DEMO_AUTH", "true")
     monkeypatch.setenv("DRISHTI_TEST_JWT_SECRET", "demo-secret-with-at-least-thirty-two-bytes")
     monkeypatch.setenv("CLERK_JWT_ISSUER", "https://issuer.test")
     monkeypatch.setenv("CLERK_JWT_AUDIENCE", "drishti")
@@ -24,6 +25,7 @@ def test_demo_token_returns_local_jwt(monkeypatch) -> None:
 
 def test_cors_preflight_skips_auth(monkeypatch) -> None:
     monkeypatch.setenv("DRISHTI_ENV", "local")
+    monkeypatch.setenv("DRISHTI_ALLOW_LOCAL_DEMO_AUTH", "true")
     monkeypatch.setenv("DRISHTI_TEST_JWT_SECRET", "demo-secret-with-at-least-thirty-two-bytes")
     monkeypatch.setenv("CLERK_JWT_ISSUER", "https://issuer.test")
     monkeypatch.setenv("CLERK_JWT_AUDIENCE", "drishti")

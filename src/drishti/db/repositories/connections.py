@@ -40,6 +40,33 @@ async def get_active_by_source(
     )
 
 
+async def get_active_shopify_by_shop_domain(
+    session: AsyncSession,
+    *,
+    shop_domain: str,
+) -> ConnectorConnection | None:
+    normalized = _normalize_shop_domain(shop_domain)
+    result = await session.execute(
+        text(
+            """
+            SELECT id, merchant_id, source, auth_payload, cursors
+            FROM resolve_shopify_connection_for_webhook(:shop_domain)
+            """
+        ),
+        {"shop_domain": normalized},
+    )
+    row = result.mappings().one_or_none()
+    if row is None:
+        return None
+    return ConnectorConnection(
+        id=row["id"],
+        merchant_id=row["merchant_id"],
+        source=row["source"],
+        auth_payload=dict(row["auth_payload"] or {}),
+        cursors=dict(row["cursors"] or {}),
+    )
+
+
 async def update_resource_cursor(
     session: AsyncSession,
     *,
@@ -71,3 +98,7 @@ async def update_resource_cursor(
             "cursor": json.dumps(cursor or {}, sort_keys=True, default=str),
         },
     )
+
+
+def _normalize_shop_domain(shop_domain: str) -> str:
+    return shop_domain.removeprefix("https://").removeprefix("http://").strip().strip("/").lower()

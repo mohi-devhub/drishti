@@ -7,7 +7,6 @@ import jwt
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from drishti.auth.clerk import LOCAL_DEMO_JWT_SECRET
 from drishti.config import get_settings
 
 router = APIRouter(prefix="/demo", tags=["demo"])
@@ -34,7 +33,11 @@ async def demo_token(merchant_key: str) -> DemoTokenResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Demo token endpoint is only available in local mode",
         )
-    secret = settings.test_jwt_secret or LOCAL_DEMO_JWT_SECRET
+    if not settings.allow_local_demo_auth or not settings.test_jwt_secret:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Demo token endpoint is disabled",
+        )
     merchant_id = DEMO_MERCHANTS.get(merchant_key)
     if merchant_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown demo merchant")
@@ -48,7 +51,7 @@ async def demo_token(merchant_key: str) -> DemoTokenResponse:
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(hours=8)).timestamp()),
         },
-        secret,
+        settings.test_jwt_secret,
         algorithm="HS256",
     )
     return DemoTokenResponse(merchant_id=merchant_id, merchant_key=merchant_key, token=token)
