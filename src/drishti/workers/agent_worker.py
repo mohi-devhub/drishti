@@ -14,6 +14,7 @@ async def run_rto_shipping_margin_agent(
     ctx: dict[str, Any],
     merchant_id: str,
     trigger: str = "scheduled",
+    run_id: str | None = None,
 ) -> dict:
     merchant_uuid = UUID(merchant_id)
     async with ctx["db_sessionmaker"]() as session:
@@ -23,6 +24,7 @@ async def run_rto_shipping_margin_agent(
             merchant_id=merchant_uuid,
             trigger=trigger,
             settings=ctx.get("settings"),
+            run_id=UUID(run_id) if run_id else None,
         )
         await session.commit()
         return result

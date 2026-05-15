@@ -2,6 +2,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import logfire
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +11,7 @@ from drishti.auth.clerk import ClerkJWTVerifier
 from drishti.auth.middleware import MerchantScopeMiddleware
 from drishti.config import get_settings
 from drishti.db.session import create_engine, create_sessionmaker
+from drishti.middleware.request_id import RequestIDMiddleware
 from drishti.observability import configure_observability
 from drishti.routes.agents import router as agents_router
 from drishti.routes.chat import router as chat_router
@@ -24,7 +27,18 @@ from drishti.routes.webhooks_shopify import router as shopify_webhooks_router
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.settings = settings
+    app.state.redis = None
+    app.state.redis_error = None
+    try:
+        app.state.redis = await create_pool(RedisSettings.from_dsn(str(settings.redis_url)))
+        await app.state.redis.ping()
+    except Exception:
+        app.state.redis_error = "Redis connection failed"
+        if settings.environment != "local":
+            raise
     yield
+    if getattr(app.state, "redis", None) is not None:
+        await app.state.redis.close()
     if hasattr(app.state, "db_engine"):
         await app.state.db_engine.dispose()
 
@@ -46,8 +60,9 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=sorted(cors_origins),
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["authorization", "content-type", "x-request-id"],
+        expose_headers=["x-request-id"],
     )
     engine = create_engine(settings)
     sessionmaker = create_sessionmaker(engine)
@@ -58,6 +73,7 @@ def create_app() -> FastAPI:
         verifier=ClerkJWTVerifier(settings),
         sessionmaker=sessionmaker,
     )
+    app.add_middleware(RequestIDMiddleware)
 
     logfire.instrument_fastapi(app)
     app.include_router(health_router)

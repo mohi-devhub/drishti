@@ -37,6 +37,58 @@ async def create(
     return result.scalar_one()
 
 
+async def create_queued(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    trigger: str,
+    input_snapshot: dict[str, Any],
+) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO agent_runs (
+                merchant_id, agent_name, trigger, status, input_snapshot, created_at
+            )
+            VALUES (
+                :merchant_id, 'rto_shipping_margin_worker', :trigger, 'queued',
+                CAST(:input_snapshot AS jsonb), now()
+            )
+            RETURNING id
+            """
+        ),
+        {
+            "merchant_id": str(merchant_id),
+            "trigger": trigger,
+            "input_snapshot": json.dumps(input_snapshot, sort_keys=True, default=str),
+        },
+    )
+    return result.scalar_one()
+
+
+async def mark_running(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    run_id: UUID,
+) -> bool:
+    result = await session.execute(
+        text(
+            """
+            UPDATE agent_runs
+            SET status = 'running',
+                started_at = COALESCE(started_at, now())
+            WHERE merchant_id = :merchant_id
+              AND id = :run_id
+              AND status = 'queued'
+            RETURNING id
+            """
+        ),
+        {"merchant_id": str(merchant_id), "run_id": str(run_id)},
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def finish(
     session: AsyncSession,
     *,
@@ -165,6 +217,28 @@ async def latest_run(
             """
         ),
         {"merchant_id": str(merchant_id)},
+    )
+    row = result.mappings().one_or_none()
+    return dict(row) if row else None
+
+
+async def get_run(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    run_id: UUID,
+) -> dict[str, Any] | None:
+    result = await session.execute(
+        text(
+            """
+            SELECT *
+            FROM agent_runs
+            WHERE merchant_id = :merchant_id
+              AND id = :run_id
+              AND agent_name = 'rto_shipping_margin_worker'
+            """
+        ),
+        {"merchant_id": str(merchant_id), "run_id": str(run_id)},
     )
     row = result.mappings().one_or_none()
     return dict(row) if row else None

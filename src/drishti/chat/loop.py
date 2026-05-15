@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
+import logfire
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,8 +38,9 @@ async def run_chat_turn(
         role="user",
         content=message,
     )
+    await session.commit()
 
-    tool_results, draft, mode = await _draft_answer(
+    tool_results, draft, mode, openai_status = await _draft_answer(
         session,
         merchant_id=merchant_id,
         caller_id=user_message_id,
@@ -68,7 +71,7 @@ async def run_chat_turn(
         caller_id=user_message_id,
         tool_name="citation_validator",
         args={"draft": draft, "mode": mode},
-        result={"answer": answer},
+        result={"answer": answer, "openai_status": openai_status},
         result_id=None,
         validation_status=_db_validation_status(validation_status),
         validation_failures=[failure.__dict__ for failure in validation.failures],
@@ -85,6 +88,7 @@ async def run_chat_turn(
         "message_id": str(assistant_message_id),
         "answer": answer,
         "validation_status": validation_status,
+        "openai_status": openai_status,
         "validation_failures": [failure.__dict__ for failure in validation.failures],
         "tool_results": [result.model_dump() for result in tool_results],
     }
@@ -96,7 +100,7 @@ async def _draft_answer(
     merchant_id: UUID,
     caller_id: UUID,
     message: str,
-) -> tuple[list[ToolResult], str, str]:
+) -> tuple[list[ToolResult], str, str, str]:
     settings = get_settings()
     if settings.openai_api_key:
         openai_result = await _openai_tool_draft(
@@ -108,7 +112,10 @@ async def _draft_answer(
             api_key=settings.openai_api_key,
         )
         if openai_result is not None:
-            return openai_result[0], openai_result[1], "openai"
+            return openai_result[0], openai_result[1], "openai", "ok"
+        openai_status = "openai_error"
+    else:
+        openai_status = "not_configured"
     tool_results = await _run_selected_tools(
         session,
         merchant_id=merchant_id,
@@ -116,7 +123,7 @@ async def _draft_answer(
         selected_tools=_select_tools(message),
         message=message,
     )
-    return tool_results, _answer_for(message, tool_results), "deterministic"
+    return tool_results, _answer_for(message, tool_results), "deterministic", openai_status
 
 
 async def _run_selected_tools(
@@ -169,6 +176,8 @@ async def _openai_tool_draft(
             "role": "system",
             "content": (
                 "You are Drishti, an ops analyst for D2C merchants. "
+                f"The current date is {datetime.now(UTC).date().isoformat()}. "
+                "Resolve relative date phrases like 'this month' against that date. "
                 "Answer using the provided tools. Every numeric value in your final answer "
                 "must be copied from a tool result and wrapped as <cite id>number</cite>. "
                 "Do not invent arithmetic or cite IDs. If a number is unavailable, omit it."
@@ -177,7 +186,8 @@ async def _openai_tool_draft(
         {"role": "user", "content": message},
     ]
     try:
-        response = await client.responses.create(
+        response = await _create_openai_response_with_retry(
+            client,
             model=model,
             input=input_items,
             tools=_openai_tool_schemas(),
@@ -207,14 +217,43 @@ async def _openai_tool_draft(
                         "output": output,
                     }
                 )
-            response = await client.responses.create(
+            response = await _create_openai_response_with_retry(
+                client,
                 model=model,
                 input=input_items,
                 tools=_openai_tool_schemas(),
             )
-    except Exception:
+    except Exception as exc:
+        logfire.exception(
+            "OpenAI chat tool loop failed; falling back to deterministic routing",
+            error_type=type(exc).__name__,
+        )
         return None
     return tool_results, response.output_text or ""
+
+
+async def _create_openai_response_with_retry(
+    client: AsyncOpenAI,
+    *,
+    model: str,
+    input: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+):
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            return await client.responses.create(model=model, input=input, tools=tools)
+        except Exception as exc:
+            last_exc = exc
+            logfire.warning(
+                "OpenAI response attempt failed",
+                attempt=attempt + 1,
+                error_type=type(exc).__name__,
+            )
+            if attempt < 2:
+                await asyncio.sleep(0.4 * (2**attempt))
+    assert last_exc is not None
+    raise last_exc
 
 
 def _openai_tool_schemas() -> list[dict[str, Any]]:
@@ -228,7 +267,7 @@ def _openai_tool_schemas() -> list[dict[str, Any]]:
                 "properties": {
                     "start_date": {"type": "string", "description": "YYYY-MM-DD"},
                     "end_date": {"type": "string", "description": "YYYY-MM-DD"},
-                    "status": {"type": "string"},
+                    "status": {"type": "string", "enum": ["confirmed", "cancelled", "refunded"]},
                     "payment_method": {"type": "string", "enum": ["cod", "prepaid"]},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 100},
                 },
@@ -377,6 +416,12 @@ def _coerce_tool_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
     coerced = {key: value for key, value in args.items() if key in allowed and value is not None}
     if "limit" in coerced:
         coerced["limit"] = max(1, min(100, int(coerced["limit"])))
+    if name == "query_orders" and "status" in coerced:
+        status = str(coerced["status"]).lower()
+        if status in {"confirmed", "cancelled", "refunded"}:
+            coerced["status"] = status
+        else:
+            coerced.pop("status", None)
     for key in ("start_date", "end_date"):
         if key in coerced and isinstance(coerced[key], str):
             coerced[key] = date.fromisoformat(coerced[key])
@@ -434,6 +479,7 @@ async def _run_tool(
         started_at=started_at,
         finished_at=datetime.now(UTC),
     )
+    await session.commit()
     return result
 
 

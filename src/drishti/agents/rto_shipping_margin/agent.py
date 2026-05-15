@@ -34,14 +34,29 @@ async def run_worker(
     merchant_id: UUID,
     trigger: str = "manual",
     settings: Settings | None = None,
+    run_id: UUID | None = None,
 ) -> dict:
-    snapshot = await input_snapshot(session, merchant_id=merchant_id)
-    run_id = await agent_runs.create(
-        session,
-        merchant_id=merchant_id,
-        trigger=trigger,
-        input_snapshot=snapshot,
-    )
+    if run_id is None:
+        snapshot = await input_snapshot(session, merchant_id=merchant_id)
+        run_id = await agent_runs.create(
+            session,
+            merchant_id=merchant_id,
+            trigger=trigger,
+            input_snapshot=snapshot,
+        )
+    else:
+        claimed = await agent_runs.mark_running(session, merchant_id=merchant_id, run_id=run_id)
+        if not claimed:
+            existing = await agent_runs.get_run(session, merchant_id=merchant_id, run_id=run_id)
+            if existing is not None:
+                return {
+                    "run_id": str(run_id),
+                    "status": existing["status"],
+                    "findings_count": existing["findings_count"],
+                    "finding_ids": [],
+                    "duties_run": existing["duties_run"] or [],
+                    "errors": existing["errors"] or {},
+                }
     result = await build_agent().detect(session)
     finding_ids = []
     for finding in result.findings:

@@ -1,4 +1,4 @@
-.PHONY: dev api worker web lint test
+.PHONY: dev api worker web lint test audit
 
 dev:
 	@printf "Starting Drishti dev processes...\n"
@@ -22,3 +22,7 @@ lint:
 
 test:
 	uv run pytest
+
+audit:
+	uvx pip-audit
+	cd web && corepack pnpm audit --audit-level moderate
