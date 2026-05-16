@@ -622,8 +622,8 @@ def _findings_answer(result: ToolResult) -> str:
     if isinstance(low, int | float) and isinstance(high, int | float):
         return (
             f"The agent has <cite {count.agg_id}>{int(count.value)}</cite> cited findings. "
-            "The latest finding has an estimated savings range of Rs "
-            f"<cite {leading.row_id}#estimated_saving_inr_low>{int(low):,}</cite> to Rs "
+            "The latest finding has an estimated savings range of ₹"
+            f"<cite {leading.row_id}#estimated_saving_inr_low>{int(low):,}</cite> to ₹"
             f"<cite {leading.row_id}#estimated_saving_inr_high>{int(high):,}</cite>."
         )
     return f"The agent has <cite {count.agg_id}>{int(count.value)}</cite> cited findings."
@@ -639,8 +639,8 @@ def _finding_detail_answer(result: ToolResult) -> str:
     parts = ["The latest finding is available with cited estimates."]
     if isinstance(low, int | float) and isinstance(high, int | float):
         parts.append(
-            "Estimated savings are Rs "
-            f"<cite {row.row_id}#estimated_saving_inr_low>{int(low):,}</cite> to Rs "
+            "Estimated savings are ₹"
+            f"<cite {row.row_id}#estimated_saving_inr_low>{int(low):,}</cite> to ₹"
             f"<cite {row.row_id}#estimated_saving_inr_high>{int(high):,}</cite>."
         )
     if isinstance(confidence, int | float):

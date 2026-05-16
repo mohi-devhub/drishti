@@ -229,7 +229,9 @@ async def query_rto_loss_by_pincode(
               COALESCE(o.shipping_pincode, s.delivery_pincode) AS pincode,
               COUNT(*) AS order_count,
               COALESCE(SUM(o.total_paise), 0) AS order_total_paise,
-              COALESCE(SUM(s.freight_paise), 0) AS freight_total_paise
+              COALESCE(SUM(s.freight_paise), 0) AS freight_total_paise,
+              ARRAY_AGG(DISTINCT 'order:' || o.id::text) AS contributing_order_ids,
+              ARRAY_AGG(DISTINCT 'shipment:' || s.id::text) AS contributing_shipment_ids
             FROM order_links ol
             JOIN orders o ON o.id = ol.order_id AND o.merchant_id = ol.merchant_id
             JOIN shipments s ON s.id = ol.shipment_id AND s.merchant_id = ol.merchant_id
@@ -304,7 +306,8 @@ async def courier_margin_by_route(
               courier_name,
               COUNT(*) AS shipment_count,
               COALESCE(SUM(freight_paise), 0) AS freight_total_paise,
-              AVG(freight_paise::numeric / NULLIF(weight_grams, 0)) AS freight_per_g
+              AVG(freight_paise::numeric / NULLIF(weight_grams, 0)) AS freight_per_g,
+              ARRAY_AGG(DISTINCT 'shipment:' || id::text) AS contributing_shipment_ids
             FROM shipments
             WHERE merchant_id = :merchant_id
               AND weight_grams > 0

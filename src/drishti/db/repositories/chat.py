@@ -76,6 +76,66 @@ async def insert_message(
     return result.scalar_one()
 
 
+async def list_sessions(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    clerk_user_id: str | None = None,
+    limit: int = 30,
+) -> list[dict[str, Any]]:
+    result = await session.execute(
+        text(
+            """
+            SELECT cs.id, cs.title, cs.clerk_user_id, cs.created_at, cs.updated_at,
+                   COUNT(cm.id) AS message_count,
+                   MAX(cm.content) FILTER (WHERE cm.created_at = latest.latest_message_at) AS latest_message
+            FROM chat_sessions cs
+            LEFT JOIN chat_messages cm
+              ON cm.merchant_id = cs.merchant_id
+             AND cm.session_id = cs.id
+            LEFT JOIN LATERAL (
+                SELECT MAX(created_at) AS latest_message_at
+                FROM chat_messages
+                WHERE merchant_id = cs.merchant_id
+                  AND session_id = cs.id
+            ) latest ON true
+            WHERE cs.merchant_id = :merchant_id
+              AND (:clerk_user_id IS NULL OR cs.clerk_user_id = :clerk_user_id)
+            GROUP BY cs.id, cs.title, cs.clerk_user_id, cs.created_at, cs.updated_at
+            ORDER BY cs.updated_at DESC
+            LIMIT :limit
+            """
+        ),
+        {
+            "merchant_id": str(merchant_id),
+            "clerk_user_id": clerk_user_id,
+            "limit": max(1, min(limit, 100)),
+        },
+    )
+    return [dict(row) for row in result.mappings().all()]
+
+
+async def list_messages(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    session_id: UUID,
+) -> list[dict[str, Any]]:
+    result = await session.execute(
+        text(
+            """
+            SELECT id, role, content, tool_call_id, created_at
+            FROM chat_messages
+            WHERE merchant_id = :merchant_id
+              AND session_id = :session_id
+            ORDER BY created_at, id
+            """
+        ),
+        {"merchant_id": str(merchant_id), "session_id": str(session_id)},
+    )
+    return [dict(row) for row in result.mappings().all()]
+
+
 async def create_tool_call(
     session: AsyncSession,
     *,
