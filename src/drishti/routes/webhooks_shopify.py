@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from drishti.config import get_settings
 from drishti.db.repositories import connections, source_records, webhook_deliveries
 from drishti.db.session import set_merchant_context
+from drishti.queue import DEFAULT_QUEUE_NAME
 from drishti.webhooks.shopify import resource_from_topic, verify_hmac
 
 router = APIRouter(prefix="/webhooks/shopify", tags=["webhooks"])
@@ -75,5 +76,10 @@ async def shopify_webhook(topic: str, request: Request) -> dict:
                 payload=payload,
                 fetched_at=datetime.now(UTC),
             )
-    await redis.enqueue_job("normalize_shopify", str(merchant_id), str(raw_record_id))
+    await redis.enqueue_job(
+        "normalize_shopify",
+        str(merchant_id),
+        str(raw_record_id),
+        _queue_name=DEFAULT_QUEUE_NAME,
+    )
     return {"status": "accepted", "source_record_id": str(raw_record_id)}

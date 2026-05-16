@@ -3,6 +3,7 @@ from arq.connections import RedisSettings
 
 from drishti.config import get_settings
 from drishti.db.session import create_engine, create_sessionmaker
+from drishti.queue import DEFAULT_QUEUE_NAME
 from drishti.workers.agent_worker import (
     agent_daily_run,
     enqueue_daily_agent_runs,
@@ -67,4 +68,4 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = redis_settings()
-    queue_name = "drishti:default"
+    queue_name = DEFAULT_QUEUE_NAME

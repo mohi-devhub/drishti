@@ -7,6 +7,7 @@ from drishti.config import get_settings
 from drishti.connectors.registry import build_connector
 from drishti.db.repositories import connections, sync_runs
 from drishti.db.session import set_merchant_context_for_worker
+from drishti.queue import DEFAULT_QUEUE_NAME
 
 
 async def sync_shopify_orders(
@@ -134,12 +135,18 @@ async def sync_resource(
             raise
 
     for raw_record_id in result.raw_record_ids:
-        await ctx["redis"].enqueue_job(f"normalize_{source}", merchant_id, str(raw_record_id))
+        await ctx["redis"].enqueue_job(
+            f"normalize_{source}",
+            merchant_id,
+            str(raw_record_id),
+            _queue_name=DEFAULT_QUEUE_NAME,
+        )
     for follow_up_resource, follow_up_cursor in result.follow_up_jobs:
         await ctx["redis"].enqueue_job(
             f"sync_{source}_{follow_up_resource}",
             merchant_id,
             follow_up_cursor,
+            _queue_name=DEFAULT_QUEUE_NAME,
         )
 
     return {

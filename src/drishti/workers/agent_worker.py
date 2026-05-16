@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from drishti.agents.rto_shipping_margin.agent import run_worker
 from drishti.db.session import set_merchant_context_for_worker
+from drishti.queue import DEFAULT_QUEUE_NAME
 
 
 async def run_rto_shipping_margin_agent(
@@ -50,5 +51,9 @@ async def enqueue_daily_agent_runs(ctx: dict[str, Any]) -> dict:
         merchant_ids = [str(row["id"]) for row in result.mappings().all()]
 
     for merchant_id in merchant_ids:
-        await ctx["redis"].enqueue_job("agent_daily_run", merchant_id)
+        await ctx["redis"].enqueue_job(
+            "agent_daily_run",
+            merchant_id,
+            _queue_name=DEFAULT_QUEUE_NAME,
+        )
     return {"enqueued": len(merchant_ids)}
