@@ -100,7 +100,7 @@ async def list_sessions(
                   AND session_id = cs.id
             ) latest ON true
             WHERE cs.merchant_id = :merchant_id
-              AND (:clerk_user_id IS NULL OR cs.clerk_user_id = :clerk_user_id)
+              AND (CAST(:clerk_user_id AS text) IS NULL OR cs.clerk_user_id = CAST(:clerk_user_id AS text))
             GROUP BY cs.id, cs.title, cs.clerk_user_id, cs.created_at, cs.updated_at
             ORDER BY cs.updated_at DESC
             LIMIT :limit
@@ -113,6 +113,49 @@ async def list_sessions(
         },
     )
     return [dict(row) for row in result.mappings().all()]
+
+
+async def delete_session(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    session_id: UUID,
+    clerk_user_id: str | None = None,
+) -> bool:
+    params = {
+        "merchant_id": str(merchant_id),
+        "session_id": str(session_id),
+        "clerk_user_id": clerk_user_id,
+    }
+    await session.execute(
+        text(
+            """
+            DELETE FROM chat_messages
+            WHERE merchant_id = :merchant_id
+              AND session_id = :session_id
+              AND session_id IN (
+                  SELECT id FROM chat_sessions
+                  WHERE merchant_id = :merchant_id
+                    AND id = :session_id
+                    AND (CAST(:clerk_user_id AS text) IS NULL OR clerk_user_id = CAST(:clerk_user_id AS text))
+              )
+            """
+        ),
+        params,
+    )
+    result = await session.execute(
+        text(
+            """
+            DELETE FROM chat_sessions
+            WHERE merchant_id = :merchant_id
+              AND id = :session_id
+              AND (CAST(:clerk_user_id AS text) IS NULL OR clerk_user_id = CAST(:clerk_user_id AS text))
+            RETURNING id
+            """
+        ),
+        params,
+    )
+    return result.scalar_one_or_none() is not None
 
 
 async def list_messages(

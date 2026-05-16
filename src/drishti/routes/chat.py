@@ -36,6 +36,24 @@ async def list_chat_sessions(
     return {"sessions": [_serialize_session(row) for row in rows]}
 
 
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat_session(
+    session_id: UUID,
+    request: Request,
+    merchant_id=Depends(get_current_merchant_id),
+) -> None:
+    session: AsyncSession = request.state.db
+    deleted = await chat_repo.delete_session(
+        session,
+        merchant_id=merchant_id,
+        session_id=session_id,
+        clerk_user_id=getattr(request.state, "clerk_user_id", None),
+    )
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
+    await session.commit()
+
+
 @router.get("/sessions/{session_id}")
 async def get_chat_session(
     session_id: UUID,
