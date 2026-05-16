@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppHeader, apiBase, authHeaders, labels, useDemoAuth } from "../components";
+import { AppHeader, SkeletonLine, apiBase, authHeaders, labels, money, moneyRange, titleize, useDemoAuth } from "../components";
 
 type Finding = {
   id: string;
@@ -34,9 +34,11 @@ export default function DashboardPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [status, setStatus] = useState("Ready");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadFindings = useCallback(async (): Promise<boolean> => {
     if (!auth.token) return false;
+    setLoading(true);
     try {
       const response = await fetch(`${apiBase()}/api/findings`, { headers: authHeaders(auth.token) });
       const payload = await response.json();
@@ -49,6 +51,8 @@ export default function DashboardPage() {
       setStatus("API unavailable");
       console.error(error);
       return false;
+    } finally {
+      setLoading(false);
     }
   }, [auth.token]);
 
@@ -100,8 +104,10 @@ export default function DashboardPage() {
 
   const summary = useMemo(() => {
     const high = findings.filter((finding) => finding.severity === "high").length;
-    const savingsLow = findings.reduce((total, finding) => total + (finding.estimated_saving_inr_low || 0), 0);
-    const savingsHigh = findings.reduce((total, finding) => total + (finding.estimated_saving_inr_high || 0), 0);
+    const lowValues = findings.map((finding) => finding.estimated_saving_inr_low).filter((value): value is number => value !== null);
+    const highValues = findings.map((finding) => finding.estimated_saving_inr_high).filter((value): value is number => value !== null);
+    const savingsLow = lowValues.length ? lowValues.reduce((total, value) => total + value, 0) : null;
+    const savingsHigh = highValues.length ? highValues.reduce((total, value) => total + value, 0) : null;
     const evidenceRows = findings.reduce((total, finding) => total + finding.evidence_row_ids.length, 0);
     return { high, savingsLow, savingsHigh, evidenceRows };
   }, [findings]);
@@ -137,8 +143,8 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <MiniStat label="Status" value={status} />
-              <MiniStat label="Evidence" value={`${summary.evidenceRows} rows`} />
+              <MiniStat label="Status" value={status} loading={loading} />
+              <MiniStat label="Evidence" value={`${summary.evidenceRows} rows`} loading={loading} />
               <MiniStat label="Agent" value={busy ? "Running" : "Idle"} />
             </div>
           </section>
@@ -146,10 +152,10 @@ export default function DashboardPage() {
           <section className="relative overflow-hidden rounded-lg border border-white/10 bg-[#080c0a]/80 p-6 shadow-2xl shadow-black/40">
             <div className="absolute inset-0 opacity-55 [background-image:radial-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:18px_18px]" />
             <div className="relative grid gap-3 sm:grid-cols-2">
-              <MetricCard label="Open findings" value={String(findings.length)} accent="white" />
-              <MetricCard label="High severity" value={String(summary.high)} accent="rose" />
-              <MetricCard label="Savings low" value={money(summary.savingsLow)} accent="emerald" />
-              <MetricCard label="Savings high" value={money(summary.savingsHigh)} accent="amber" />
+              <MetricCard label="Open findings" value={String(findings.length)} accent="white" loading={loading} />
+              <MetricCard label="High severity" value={String(summary.high)} accent="rose" loading={loading} />
+              <MetricCard label="Savings low" value={money(summary.savingsLow)} accent="emerald" loading={loading} />
+              <MetricCard label="Savings high" value={money(summary.savingsHigh)} accent="amber" loading={loading} />
             </div>
           </section>
         </div>
@@ -180,7 +186,8 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="divide-y divide-white/10">
-              {findings.slice(0, 5).map((finding) => (
+              {loading ? <FindingQueueSkeleton /> : null}
+              {!loading && findings.slice(0, 5).map((finding) => (
                 <Link key={finding.id} href="/findings" className="grid gap-3 px-5 py-4 transition hover:bg-white/[0.04] md:grid-cols-[1fr_auto]">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -193,13 +200,13 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-left md:text-right">
                     <p className="text-sm font-semibold text-white">
-                      {money(finding.estimated_saving_inr_low)} - {money(finding.estimated_saving_inr_high)}
+                      {moneyRange(finding.estimated_saving_inr_low, finding.estimated_saving_inr_high)}
                     </p>
                     <p className="mt-1 text-xs text-white/40">{finding.evidence_row_ids.length} rows</p>
                   </div>
                 </Link>
               ))}
-              {findings.length === 0 ? (
+              {!loading && findings.length === 0 ? (
                 <div className="px-5 py-12 text-center text-sm text-white/45">No findings loaded for this merchant.</div>
               ) : null}
             </div>
@@ -228,16 +235,16 @@ export default function DashboardPage() {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value, loading = false }: { label: string; value: string; loading?: boolean }) {
   return (
     <div className="rounded-md border border-white/10 bg-black/20 p-3">
       <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/35">{label}</p>
-      <p className="mt-2 truncate text-sm font-semibold text-white">{value}</p>
+      {loading ? <SkeletonLine className="mt-2 h-5 w-24" /> : <p className="mt-2 truncate text-sm font-semibold text-white">{value}</p>}
     </div>
   );
 }
 
-function MetricCard({ label, value, accent }: { label: string; value: string; accent: "white" | "rose" | "emerald" | "amber" }) {
+function MetricCard({ label, value, accent, loading = false }: { label: string; value: string; accent: "white" | "rose" | "emerald" | "amber"; loading?: boolean }) {
   const accentClass = {
     white: "text-white",
     rose: "text-rose-200",
@@ -247,8 +254,30 @@ function MetricCard({ label, value, accent }: { label: string; value: string; ac
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/35">{label}</p>
-      <p className={`mt-3 min-h-9 text-2xl font-semibold tracking-[-0.03em] ${accentClass}`}>{value}</p>
+      {loading ? <SkeletonLine className="mt-3 h-9 w-28" /> : <p className={`mt-3 min-h-9 text-2xl font-semibold tracking-[-0.03em] ${accentClass}`}>{value}</p>}
     </div>
+  );
+}
+
+function FindingQueueSkeleton() {
+  return (
+    <>
+      {[0, 1, 2].map((index) => (
+        <div key={index} className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_auto]">
+          <div>
+            <div className="flex gap-2">
+              <SkeletonLine className="h-5 w-14" />
+              <SkeletonLine className="h-5 w-28" />
+            </div>
+            <SkeletonLine className="mt-3 h-5 w-48" />
+          </div>
+          <div className="md:text-right">
+            <SkeletonLine className="h-5 w-32" />
+            <SkeletonLine className="mt-2 h-4 w-16 md:ml-auto" />
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -269,12 +298,4 @@ function severityClass(severity: string) {
   if (severity === "high") return "bg-rose-300/15 text-rose-100 ring-1 ring-rose-200/20";
   if (severity === "medium") return "bg-amber-300/15 text-amber-100 ring-1 ring-amber-200/20";
   return "bg-white/10 text-white/70 ring-1 ring-white/10";
-}
-
-function titleize(value: string) {
-  return value.replaceAll("_", " ");
-}
-
-function money(value: number | null) {
-  return value === null || value === 0 ? "Rs 0" : `Rs ${value.toLocaleString("en-IN")}`;
 }

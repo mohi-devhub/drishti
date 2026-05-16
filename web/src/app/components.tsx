@@ -27,8 +27,14 @@ function demoMerchantSwitcherEnabled(authMode: AuthMode) {
 
 type AuthMode = "clerk" | "demo";
 
+const bypassAuthState = {
+  getToken: async () => null,
+  isLoaded: true,
+  isSignedIn: false,
+} as ReturnType<typeof useAuth>;
+
 export function useDemoAuth() {
-  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useClerkAuthState();
   const [merchant, setMerchant] = useState<MerchantKey>("merchant_c");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
@@ -89,6 +95,15 @@ export function useDemoAuth() {
   return { merchant, token, error, authMode, setToken: setManualToken, refresh, labels };
 }
 
+function useClerkAuthState(): ReturnType<typeof useAuth> {
+  if (process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === "true") {
+    return bypassAuthState;
+  }
+  // This branch is compiled out for E2E builds, where ClerkProvider is intentionally disabled.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useAuth();
+}
+
 export function AppHeader({
   merchant,
   authMode = "demo",
@@ -102,6 +117,7 @@ export function AppHeader({
 }) {
   const pathname = usePathname();
   const showMerchantSwitcher = demoMerchantSwitcherEnabled(authMode);
+  const disableClerkUi = process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === "true";
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#050706]/85 backdrop-blur-xl">
@@ -126,6 +142,9 @@ export function AppHeader({
             <NavLink href="/findings" active={pathname === "/findings"}>
               Findings
             </NavLink>
+            <NavLink href="/connections" active={pathname === "/connections"}>
+              Connections
+            </NavLink>
           </nav>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -146,23 +165,27 @@ export function AppHeader({
               </select>
             </label>
           ) : null}
-          <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button className="h-11 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/80 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white">
-                Sign in
-              </button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <button className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-emerald-100">
-                Sign up
-              </button>
-            </SignUpButton>
-          </Show>
-          <Show when="signed-in">
-            <div className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
-              <UserButton />
-            </div>
-          </Show>
+          {!disableClerkUi ? (
+            <>
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button className="h-11 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/80 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white">
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-emerald-100">
+                    Sign up
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <div className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
+                  <UserButton />
+                </div>
+              </Show>
+            </>
+          ) : null}
         </div>
       </div>
     </header>
@@ -194,7 +217,13 @@ export function authHeaders(token: string): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-export function CitationText({ text }: { text: string }) {
+export function CitationText({
+  text,
+  onCitation,
+}: {
+  text: string;
+  onCitation?: (citationId: string) => void;
+}) {
   const parts = useMemo(() => {
     const output: Array<{ text: string; cite?: string }> = [];
     const regex = /<cite\s+([^>]+)>(.*?)<\/cite>/g;
@@ -212,13 +241,45 @@ export function CitationText({ text }: { text: string }) {
     <>
       {parts.map((part, index) =>
         part.cite ? (
-          <span key={index} className="rounded bg-amber-300/20 px-1 font-medium text-amber-100 ring-1 ring-amber-200/20" title={part.cite}>
+          <button
+            key={index}
+            type="button"
+            onClick={() => onCitation?.(part.cite || "")}
+            className="rounded bg-amber-300/20 px-1 font-medium text-amber-100 underline decoration-amber-100/35 underline-offset-4 ring-1 ring-amber-200/20 transition hover:bg-amber-300/30"
+            title={part.cite}
+          >
             {part.text}
-          </span>
+          </button>
         ) : (
           <span key={index}>{part.text}</span>
         ),
       )}
     </>
   );
+}
+
+const acronymLabels = new Set(["awb", "cod", "rto", "sla"]);
+
+export function titleize(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .split(" ")
+    .map((word) => {
+      const normalized = word.toLowerCase();
+      if (acronymLabels.has(normalized)) return normalized.toUpperCase();
+      return word;
+    })
+    .join(" ");
+}
+
+export function money(value: number | null | undefined) {
+  return value === null || value === undefined ? "-" : `₹${value.toLocaleString("en-IN")}`;
+}
+
+export function moneyRange(low: number | null | undefined, high: number | null | undefined) {
+  return low == null && high == null ? "-" : `${money(low)} - ${money(high)}`;
+}
+
+export function SkeletonLine({ className = "" }: { className?: string }) {
+  return <span className={`block animate-pulse rounded bg-white/10 ${className}`} />;
 }

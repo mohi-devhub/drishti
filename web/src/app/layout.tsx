@@ -12,6 +12,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  if (process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === "true") {
+    return (
+      <html lang="en" className="h-full antialiased">
+        <body className="flex min-h-full flex-col">{children}</body>
+      </html>
+    );
+  }
   return (
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col">

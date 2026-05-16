@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LandingBeamGraphic } from "./landing-beam-graphic";
 
 export default function LandingPage() {
+  const disableClerkUi = process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === "true";
+
   return (
     <main className="min-h-screen overflow-hidden text-white">
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-8">
@@ -14,26 +16,34 @@ export default function LandingPage() {
           </span>
         </Link>
         <nav className="flex items-center gap-3">
-          <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button className="flex h-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] px-5 text-sm font-semibold text-white hover:border-emerald-200/50 hover:bg-emerald-200/10">
-                Sign in
-              </button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <button className="flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black hover:bg-emerald-100">
-                Sign up
-              </button>
-            </SignUpButton>
-          </Show>
-          <Show when="signed-in">
+          {disableClerkUi ? (
             <Link className="flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black hover:bg-emerald-100" href="/dashboard">
               Open dashboard
             </Link>
-            <div className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
-              <UserButton />
-            </div>
-          </Show>
+          ) : (
+            <>
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button className="flex h-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] px-5 text-sm font-semibold text-white hover:border-emerald-200/50 hover:bg-emerald-200/10">
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black hover:bg-emerald-100">
+                    Sign up
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <Link className="flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black hover:bg-emerald-100" href="/dashboard">
+                  Open dashboard
+                </Link>
+                <div className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
+                  <UserButton />
+                </div>
+              </Show>
+            </>
+          )}
         </nav>
       </header>
 
