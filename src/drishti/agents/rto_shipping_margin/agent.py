@@ -57,9 +57,27 @@ async def run_worker(
                     "duties_run": existing["duties_run"] or [],
                     "errors": existing["errors"] or {},
                 }
-    result = await build_agent().detect(session)
+        await session.commit()
+    agent = build_agent()
+    configs = await agent_runs.list_duty_configs(session, merchant_id=merchant_id)
+    disabled_duties = {row["duty"] for row in configs if not row["enabled"]}
+    agent.duties = [duty for duty in agent.duties if duty.name not in disabled_duties]
+    result = await agent.detect(session)
+    if disabled_duties:
+        result.duties_skipped.extend(
+            {"duty": duty, "reason": "disabled_by_config"} for duty in sorted(disabled_duties)
+        )
     finding_ids = []
     for finding in result.findings:
+        if await _is_cancelled(session, merchant_id=merchant_id, run_id=run_id):
+            return {
+                "run_id": str(run_id),
+                "status": "cancelled",
+                "findings_count": len(finding_ids),
+                "finding_ids": [str(finding_id) for finding_id in finding_ids],
+                "duties_run": result.duties_run,
+                "errors": result.errors,
+            }
         narrative, narrative_status, citations = await narrate(finding, settings=settings)
         finding_ids.append(
             await agent_runs.insert_finding(
@@ -79,7 +97,17 @@ async def run_worker(
                 citations=citations,
             )
         )
+        await session.commit()
     status = "partial" if result.errors or result.duties_skipped else "completed"
+    if await _is_cancelled(session, merchant_id=merchant_id, run_id=run_id):
+        return {
+            "run_id": str(run_id),
+            "status": "cancelled",
+            "findings_count": len(finding_ids),
+            "finding_ids": [str(finding_id) for finding_id in finding_ids],
+            "duties_run": result.duties_run,
+            "errors": result.errors,
+        }
     await agent_runs.finish(
         session,
         merchant_id=merchant_id,
@@ -98,6 +126,11 @@ async def run_worker(
         "duties_run": result.duties_run,
         "errors": result.errors,
     }
+
+
+async def _is_cancelled(session: AsyncSession, *, merchant_id: UUID, run_id: UUID) -> bool:
+    row = await agent_runs.get_run(session, merchant_id=merchant_id, run_id=run_id)
+    return bool(row and row["status"] == "cancelled")
 
 
 async def input_snapshot(session: AsyncSession, *, merchant_id: UUID) -> dict:
