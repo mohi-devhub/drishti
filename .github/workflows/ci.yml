@@ -32,8 +32,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm lint
       - run: corepack pnpm build
@@ -80,8 +78,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
       - run: uv sync --frozen --all-groups
       - run: uvx pip-audit
       - run: corepack pnpm install --frozen-lockfile
