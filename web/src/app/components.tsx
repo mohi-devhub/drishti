@@ -1,6 +1,7 @@
 "use client";
 
 import { Show, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/nextjs";
+import { Eye } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -124,8 +125,22 @@ export function AppHeader({
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-4">
           <Link href="/dashboard" className="group flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-md border border-white/15 bg-white text-sm font-semibold text-black shadow-[0_0_32px_rgba(255,255,255,0.12)]">
-              D
+            <span
+              aria-hidden
+              className="relative grid size-9 place-items-center rounded-full text-black"
+              style={{
+                background:
+                  "radial-gradient(circle at 32% 28%, #ffffff 0%, #e4e4e7 60%, #a1a1aa 100%)",
+                boxShadow:
+                  "0 0 24px rgba(255,255,255,0.18), inset 0 -3px 6px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.85)",
+              }}
+            >
+              <Eye className="size-[18px]" strokeWidth={2.25} />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)" }}
+              />
             </span>
             <span>
               <span className="block text-sm font-semibold leading-4 text-white">Drishti</span>
