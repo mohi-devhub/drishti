@@ -105,11 +105,12 @@ function Hero({ disableClerkUi }: { disableClerkUi: boolean }) {
           transition={{ duration: 0.5, delay: 0 }}
           className="liquid-glass mb-6 inline-flex items-center gap-2 rounded-lg px-3 py-2"
         >
-          <span className="rounded-md bg-foreground px-2 py-0.5 text-sm font-medium text-background">
-            New
+          <span aria-hidden className="relative grid size-2.5 place-items-center">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
           </span>
-          <span className="text-sm font-medium text-muted-foreground">
-            AI ops analyst for D2C brands
+          <span className="text-sm font-medium text-foreground">
+            Watching your D2C stack, around the clock
           </span>
         </motion.div>
 
