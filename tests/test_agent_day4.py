@@ -12,6 +12,8 @@ from drishti.agents.rto_shipping_margin.narrator import narrate
 from drishti.agents.base import Finding
 from drishti.chat.tools.registry import TOOL_REGISTRY
 from drishti.webhooks.shopify import resource_from_topic, verify_hmac
+from drishti.webhooks.razorpay import resource_and_record, verify_signature
+from drishti.webhooks.shiprocket import resource_from_payload, verify_secret
 from drishti.worker import WorkerSettings
 from drishti.workers.agent_worker import (
     agent_daily_run,
@@ -73,6 +75,31 @@ def test_shopify_topic_maps_to_resource() -> None:
     assert resource_from_topic("orders/create") == "orders"
     assert resource_from_topic("customers/update") == "customers"
     assert resource_from_topic("products/create") == "products"
+
+
+def test_razorpay_webhook_signature_and_resource_extraction() -> None:
+    body = b'{"event":"payment.captured"}'
+    secret = "razorpay-secret"
+    digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+    assert verify_signature(body=body, header=digest, secret=secret) is True
+    assert verify_signature(body=body, header="bad", secret=secret) is False
+
+    resource, record = resource_and_record(
+        {
+            "event": "refund.processed",
+            "payload": {"refund": {"entity": {"id": "rfnd_1", "amount": 100}}},
+        }
+    )
+    assert resource == "refunds"
+    assert record["id"] == "rfnd_1"
+
+
+def test_shiprocket_webhook_secret_and_resource_extraction() -> None:
+    assert verify_secret(header="shiprocket-secret", secret="shiprocket-secret") is True
+    assert verify_secret(header="bad", secret="shiprocket-secret") is False
+    assert resource_from_payload({"awb": "AWB123"}, "tracking/update") == "tracking"
+    assert resource_from_payload({"shipment_id": "ship_1"}, "shipment/update") == "shipments"
 
 
 @pytest.mark.asyncio

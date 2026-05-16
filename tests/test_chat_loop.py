@@ -3,6 +3,7 @@ from __future__ import annotations
 from drishti.chat.citation_validator import validate_citations
 from drishti.chat.loop import _answer_for, _coerce_tool_args, _db_validation_status, _select_tools
 from drishti.chat.tools.registry import CitedAggregate, CitedRow, ToolResult
+from drishti.routes.chat import _answer_chunks, _sse
 
 
 def test_chat_selects_cross_source_tools_for_shipping_loss_question() -> None:
@@ -120,3 +121,12 @@ def test_empty_tool_sections_do_not_pollute_useful_fallback_answer() -> None:
 
     assert "did not find cited order revenue" not in answer
     assert "RTO shipping loss" in answer
+
+
+def test_sse_helpers_emit_event_frames_and_answer_chunks() -> None:
+    frame = _sse("delta", {"text": "hello"})
+    chunks = _answer_chunks("one two three four five six seven eight nine ten")
+
+    assert frame.startswith("event: delta\n")
+    assert 'data: {"text": "hello"}' in frame
+    assert "".join(chunks).replace("  ", " ").strip() == "one two three four five six seven eight nine ten"

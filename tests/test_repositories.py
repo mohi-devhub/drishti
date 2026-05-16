@@ -142,16 +142,29 @@ async def test_chat_repository_writes_are_merchant_scoped() -> None:
         role="user",
         content="hello",
     )
+    await chat.list_sessions(session, merchant_id=MERCHANT_A, clerk_user_id="user_123")
+    await chat.list_messages(
+        session,
+        merchant_id=MERCHANT_A,
+        session_id=UUID("60000000-0000-0000-0000-000000000001"),
+    )
 
     create_sql, create_params = session.calls[0]
     message_sql, message_params = session.calls[1]
     update_sql, update_params = session.calls[2]
+    list_sessions_sql, list_sessions_params = session.calls[3]
+    list_messages_sql, list_messages_params = session.calls[4]
     assert "INSERT INTO chat_sessions" in create_sql
     assert create_params["merchant_id"] == str(MERCHANT_A)
     assert "INSERT INTO chat_messages" in message_sql
     assert message_params["merchant_id"] == str(MERCHANT_A)
     assert "WHERE merchant_id = :merchant_id" in update_sql
     assert update_params["merchant_id"] == str(MERCHANT_A)
+    assert "FROM chat_sessions" in list_sessions_sql
+    assert list_sessions_params["merchant_id"] == str(MERCHANT_A)
+    assert "FROM chat_messages" in list_messages_sql
+    assert "WHERE merchant_id = :merchant_id" in list_messages_sql
+    assert list_messages_params["merchant_id"] == str(MERCHANT_A)
 
 
 @pytest.mark.asyncio
