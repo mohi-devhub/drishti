@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppHeader, CitationText, SkeletonLine, apiBase, authHeaders, labels, useDemoAuth, type MerchantKey } from "../components";
@@ -149,6 +150,26 @@ function ChatWorkspace() {
     setSelectedRowId(null);
     setSessionId(null);
     setInput(prompts[0]);
+  }
+
+  async function deleteSession(id: string) {
+    if (!auth.token) return;
+    if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+    try {
+      const token = await auth.getFreshToken();
+      const response = await fetch(`${apiBase()}/chat/sessions/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+      if (!response.ok && response.status !== 204) {
+        const text = await response.text();
+        throw new Error(text || `Failed to delete (HTTP ${response.status})`);
+      }
+      setSessions((current) => current.filter((session) => session.id !== id));
+      if (sessionId === id) newChat();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function loadSession(id: string) {
@@ -310,55 +331,74 @@ function ChatWorkspace() {
         authMode={auth.authMode}
         onMerchant={switchMerchant}
       />
-      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 xl:grid-cols-12">
-        <aside className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30 xl:col-span-2">
-          <div className="flex items-center justify-between border-b border-white/10 bg-black/25 px-4 py-3">
-            <h2 className="text-sm font-semibold">Chat history</h2>
-            <button
-              onClick={newChat}
-              className="h-8 rounded-full bg-white px-3 text-xs font-semibold text-black hover:bg-emerald-100"
-            >
-              New
-            </button>
+      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-8 xl:grid-cols-12">
+        <aside className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40 xl:col-span-2">
+          <div className="border-b border-white/10 bg-black/30 px-4 py-3">
+            <h2 className="text-sm font-semibold text-white">Chat history</h2>
           </div>
           <div className="max-h-64 overflow-auto p-2 xl:max-h-[calc(100vh-220px)]">
             {sessionsLoading ? <ChatHistorySkeleton /> : null}
             {!sessionsLoading && sessions.map((chatSession) => (
-              <button
+              <div
                 key={chatSession.id}
-                onClick={() => loadSession(chatSession.id)}
-                className={`mb-2 block w-full rounded-md border px-3 py-3 text-left transition ${
+                className={`group relative mb-2 rounded-xl border transition ${
                   sessionId === chatSession.id
-                    ? "border-emerald-200/35 bg-emerald-200/10"
+                    ? "border-emerald-300/30 bg-emerald-300/10"
                     : "border-white/10 bg-black/20 hover:bg-white/[0.05]"
                 }`}
               >
-                <span className="block truncate text-sm font-semibold text-white">
-                  {chatSession.title || "Untitled chat"}
-                </span>
-                <span className="mt-1 block truncate text-xs text-white/42">
-                  {chatSession.latest_message || `${chatSession.message_count} messages`}
-                </span>
-              </button>
+                <button
+                  onClick={() => loadSession(chatSession.id)}
+                  className="block w-full px-3 py-3 pr-9 text-left"
+                >
+                  <span className="block truncate text-sm font-semibold text-white">
+                    {chatSession.title || "Untitled chat"}
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-white/45">
+                    {chatSession.latest_message || `${chatSession.message_count} messages`}
+                  </span>
+                  <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.18em] text-white/35">
+                    {chatSession.updated_at ? formatRelative(chatSession.updated_at) : ""}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Delete chat"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void deleteSession(chatSession.id);
+                  }}
+                  className="absolute right-2 top-2 grid size-7 place-items-center rounded-md text-white/45 opacity-0 transition hover:bg-rose-300/15 hover:text-rose-100 focus:opacity-100 group-hover:opacity-100"
+                >
+                  <Trash2 className="size-3.5" strokeWidth={2} />
+                </button>
+              </div>
             ))}
             {!sessionsLoading && sessions.length === 0 ? (
-              <p className="p-4 text-sm text-white/45">No saved chats for this merchant yet.</p>
+              <p className="px-3 py-6 text-center text-xs text-white/45">No saved chats yet</p>
             ) : null}
           </div>
         </aside>
 
-        <section className="flex min-h-[calc(100vh-132px)] flex-col overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/40 xl:col-span-6">
-          <div className="border-b border-white/10 bg-black/25 px-5 py-4">
+        <section className="flex min-h-[calc(100vh-132px)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40 xl:col-span-6">
+          <div
+            className="border-b border-white/10 bg-black/30 px-5 py-5"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 0% 0%, rgba(110,231,183,0.06), transparent 50%)",
+            }}
+          >
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.28em] text-white/35">{labels[auth.merchant]}</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Cited chat</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">{labels[auth.merchant]}</p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Cited chat</h1>
+              <p className="mt-1 text-xs text-white/45">Every number traces back to source</p>
             </div>
             <div className="mt-4 grid gap-2 lg:grid-cols-3">
               {prompts.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => setInput(prompt)}
-                  className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium leading-5 text-white/60 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white"
+                  className="min-h-12 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium leading-5 text-white/65 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 hover:text-white"
                 >
                   {prompt}
                 </button>
@@ -418,26 +458,29 @@ function ChatWorkspace() {
               </div>
             ) : null}
           </div>
-          <form onSubmit={send} className="border-t border-white/10 bg-black/30 p-4">
-            <div className="flex gap-2 rounded-[28px] border border-white/10 bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus-within:border-emerald-200/40 focus-within:ring-2 focus-within:ring-emerald-200/10">
+          <form onSubmit={send} className="border-t border-white/10 bg-black/35 p-4">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition focus-within:border-emerald-200/40 focus-within:bg-black/40">
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                className="chat-composer-input h-11 min-w-0 flex-1 appearance-none border-0 bg-transparent px-4 text-sm text-white outline-none ring-0 placeholder:text-white/25 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none"
-                placeholder="Ask about revenue, returns, shipments, or evidence"
+                className="chat-composer-input h-11 min-w-0 flex-1 appearance-none border-0 bg-transparent px-5 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none"
+                placeholder="Ask anything across your tools…"
               />
-              <button disabled={busy || !auth.token} className="h-11 rounded-full bg-white px-6 text-sm font-semibold text-black transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/55 disabled:text-black/70">
-                {busy ? "Sending" : "Send"}
+              <button
+                disabled={busy || !auth.token}
+                className="h-11 rounded-full bg-white px-6 text-sm font-semibold text-black transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/40"
+              >
+                {busy ? "Sending…" : "Send"}
               </button>
             </div>
           </form>
         </section>
 
         <aside className="grid content-start gap-5 xl:col-span-4">
-          <section className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30">
-            <div className="flex items-center justify-between border-b border-white/10 bg-black/25 px-4 py-3">
-              <h2 className="text-sm font-semibold">Evidence rows</h2>
-              <span className="rounded-full bg-emerald-200/10 px-2 py-1 text-xs font-medium text-emerald-100">{lastRows.length}</span>
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between border-b border-white/10 bg-black/30 px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">Evidence rows</h2>
+              <span className="rounded-full bg-emerald-300/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-100 ring-1 ring-emerald-200/25">{lastRows.length}</span>
             </div>
             <div className="max-h-72 overflow-auto p-2">
               {busy && lastRows.length === 0 ? <EvidenceRowsSkeleton /> : null}
@@ -461,9 +504,9 @@ function ChatWorkspace() {
               {!busy && lastRows.length === 0 ? <p className="p-4 text-sm text-white/45">No evidence rows yet.</p> : null}
             </div>
           </section>
-          <section className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30">
-            <div className="border-b border-white/10 bg-black/25 px-4 py-3">
-              <h2 className="text-sm font-semibold">Evidence detail</h2>
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40">
+            <div className="border-b border-white/10 bg-black/30 px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">Evidence detail</h2>
             </div>
             {isAggregateRaw(raw) ? <AggregateDetail raw={raw} /> : null}
             {raw?.status === "loading" ? (
@@ -599,4 +642,18 @@ function isAggregateRaw(raw: Record<string, unknown> | null): raw is Record<stri
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function formatRelative(isoTimestamp: string) {
+  const ts = new Date(isoTimestamp).getTime();
+  if (Number.isNaN(ts)) return "";
+  const diff = Date.now() - ts;
+  const sec = Math.round(diff / 1000);
+  if (sec < 60) return "Just now";
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.round(hr / 24);
+  return `${day}d ago`;
 }

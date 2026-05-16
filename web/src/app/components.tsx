@@ -51,6 +51,18 @@ export function useDemoAuth() {
     localStorage.setItem("drishti.token", value);
   }, []);
 
+  const getFreshToken = useCallback(async (): Promise<string> => {
+    if (isLoaded && isSignedIn) {
+      const template = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || undefined;
+      const fresh = await getToken(template ? { template } : undefined);
+      if (fresh) {
+        setToken(fresh);
+        return fresh;
+      }
+    }
+    return token;
+  }, [getToken, isLoaded, isSignedIn, token]);
+
   const refresh = useCallback(async (nextMerchant: MerchantKey = "merchant_c") => {
     setError("");
     setMerchant(nextMerchant);
@@ -95,7 +107,7 @@ export function useDemoAuth() {
     return () => window.clearTimeout(timer);
   }, [isLoaded, refresh]);
 
-  return { merchant, token, error, authMode, setToken: setManualToken, refresh, labels };
+  return { merchant, token, error, authMode, setToken: setManualToken, refresh, getFreshToken, labels };
 }
 
 function useClerkAuthState(): ReturnType<typeof useAuth> {
