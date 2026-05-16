@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pretest:e2e": "DRISHTI_E2E_AUTH_BYPASS=true NEXT_PUBLIC_E2E_AUTH_BYPASS=true NEXT_PUBLIC_ENABLE_DEMO_MERCHANT_SWITCHER=true NEXT_PUBLIC_API_URL=http://127.0.0.1:8787 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA CLERK_SECRET_KEY=sk_test_dummy next build",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.3",
@@ -16,6 +18,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "4.3.0",
     "@types/node": "20.19.40",
     "@types/react": "19.2.14",
