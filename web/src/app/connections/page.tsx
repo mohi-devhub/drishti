@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, CheckCircle2, Link2, Loader2, ShieldCheck } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AppHeader, apiBase, authHeaders, labels, useDemoAuth } from "../components";
 
@@ -152,29 +153,35 @@ export default function ConnectionsPage() {
         authMode={auth.authMode}
         onMerchant={auth.refresh}
       />
-      <section className="mx-auto grid max-w-7xl gap-5 px-5 py-6">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/40">
-          <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/35">
-            {labels[auth.merchant]}
-          </p>
-          <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <section className="mx-auto max-w-7xl grid gap-5 px-5 py-8">
+        <section
+          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] p-6 shadow-2xl shadow-black/40 sm:p-8"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 0% 0%, rgba(110,231,183,0.08), transparent 50%), radial-gradient(circle at 100% 100%, rgba(110,231,183,0.05), transparent 60%)",
+          }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-4xl font-semibold tracking-[-0.05em]">Connections</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/50">
-                Connect commerce, logistics, and payments sources for this merchant.
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
+                {labels[auth.merchant]}
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+                Connections
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
+                Plug in your commerce, logistics, and payments tools so Drishti has the full picture.
               </p>
             </div>
-            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-medium text-white/60">
-              {status}
-            </span>
+            <StatusPill status={status} />
           </div>
-        </div>
+        </section>
 
         <div className="grid gap-5 xl:grid-cols-3">
           {sources.map((source) => (
             <section
               key={source}
-              className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30"
+              className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40 transition hover:border-white/15"
             >
               <ConnectionHeader
                 connection={bySource[source] as Connection | undefined}
@@ -284,28 +291,73 @@ function ConnectionHeader({
   source: Connection["source"];
 }) {
   const status = connection?.status || "not_connected";
+  const isActive = status === "active";
   return (
-    <div className="border-b border-white/10 bg-black/25 p-5">
+    <div className="border-b border-white/10 bg-black/30 p-5">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">{connection?.display_name || sourceLabels[source]}</h2>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-white/35">{status}</p>
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04]">
+            <Link2 className="size-4 text-white/70" strokeWidth={2} />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-white">{connection?.display_name || sourceLabels[source]}</h2>
+            <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/40">{titleizeStatus(status)}</p>
+          </div>
         </div>
-        <span className={`size-3 rounded-full ${status === "active" ? "bg-emerald-300" : "bg-white/20"}`} />
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ring-1 ${
+            isActive
+              ? "bg-emerald-300/15 text-emerald-100 ring-emerald-200/25"
+              : "bg-white/[0.04] text-white/55 ring-white/10"
+          }`}
+        >
+          <span className={`size-1.5 rounded-full ${isActive ? "bg-emerald-300" : "bg-white/40"}`} />
+          {isActive ? "Live" : "Off"}
+        </span>
       </div>
-      <dl className="mt-4 grid gap-2 text-xs text-white/48">
+      <dl className="mt-4 grid gap-2 text-xs">
         {Object.entries(connection?.details || {}).map(([key, value]) => (
           <div key={key} className="grid grid-cols-[88px_1fr] gap-2">
-            <dt className="uppercase tracking-[0.16em] text-white/30">{key}</dt>
-            <dd className="truncate text-white/65">{value || "-"}</dd>
+            <dt className="font-medium uppercase tracking-[0.16em] text-white/35">{key}</dt>
+            <dd className="truncate text-white/70">{value || "—"}</dd>
           </div>
         ))}
         <div className="grid grid-cols-[88px_1fr] gap-2">
-          <dt className="uppercase tracking-[0.16em] text-white/30">Synced</dt>
-          <dd className="truncate text-white/65">{connection?.last_synced_at || "-"}</dd>
+          <dt className="font-medium uppercase tracking-[0.16em] text-white/35">Synced</dt>
+          <dd className="truncate text-white/70">{connection?.last_synced_at || "—"}</dd>
         </div>
       </dl>
     </div>
+  );
+}
+
+function titleizeStatus(status: string) {
+  return status.replaceAll("_", " ");
+}
+
+function StatusPill({ status }: { status: string }) {
+  const isError = status === "Connections API unavailable";
+  const isLoading = status === "Loading" || status === "Saving";
+  const isReady = status === "Ready" || status === "Saved";
+  const icon = isError ? (
+    <AlertTriangle className="size-3.5" strokeWidth={2.25} />
+  ) : isLoading ? (
+    <Loader2 className="size-3.5 animate-spin" strokeWidth={2.25} />
+  ) : isReady ? (
+    <CheckCircle2 className="size-3.5" strokeWidth={2.25} />
+  ) : (
+    <ShieldCheck className="size-3.5" strokeWidth={2.25} />
+  );
+  const classes = isError
+    ? "border-rose-300/30 bg-rose-300/10 text-rose-100"
+    : isReady
+      ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+      : "border-white/10 bg-black/25 text-white/65";
+  return (
+    <span className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-xs font-medium ${classes}`}>
+      {icon}
+      {status}
+    </span>
   );
 }
 
@@ -345,7 +397,7 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
-        className="h-11 rounded-md border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-emerald-200/45 focus:ring-2 focus:ring-emerald-200/10"
+        className="h-11 rounded-xl border border-white/10 bg-black/30 px-3.5 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-emerald-200/45 focus:bg-black/40"
       />
     </label>
   );
@@ -355,7 +407,7 @@ function ActionButton({ children, disabled }: { children: string; disabled?: boo
   return (
     <button
       disabled={disabled}
-      className="h-10 rounded-full bg-white px-4 text-sm font-semibold text-black transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/50"
+      className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/40"
     >
       {children}
     </button>

@@ -242,19 +242,26 @@ export default function FindingsPage() {
         authMode={auth.authMode}
         onMerchant={switchMerchant}
       />
-      <section className="mx-auto grid max-w-7xl gap-5 px-5 py-6">
-        <div className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/40">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="mx-auto max-w-7xl grid gap-5 px-5 py-8">
+        <section
+          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] p-6 shadow-2xl shadow-black/40 sm:p-8"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 0% 0%, rgba(110,231,183,0.08), transparent 50%), radial-gradient(circle at 100% 100%, rgba(110,231,183,0.05), transparent 60%)",
+          }}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/35">{labels[auth.merchant]}</p>
-              <h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Agent findings</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">{labels[auth.merchant]}</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Agent findings</h1>
+              <p className="mt-2 max-w-md text-sm leading-6 text-white/55">{status}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {run && ["queued", "running"].includes(run.status) ? (
                 <button
                   onClick={cancelRun}
                   disabled={busy || !auth.token}
-                  className="h-10 rounded-full border border-rose-200/25 bg-rose-300/10 px-5 text-sm font-semibold text-rose-50 transition hover:bg-rose-300/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center rounded-full border border-rose-300/30 bg-rose-300/10 px-5 text-sm font-semibold text-rose-100 transition hover:bg-rose-300/15 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel run
                 </button>
@@ -262,34 +269,37 @@ export default function FindingsPage() {
               <button
                 onClick={exportFindings}
                 disabled={!findings.length}
-                className="h-10 rounded-full border border-white/10 bg-white/[0.06] px-5 text-sm font-semibold text-white/75 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 disabled:cursor-not-allowed disabled:opacity-45"
+                className="inline-flex h-11 items-center rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-white/75 transition hover:border-emerald-200/40 hover:bg-emerald-200/10 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Export JSON
               </button>
               <button
                 onClick={runAgent}
                 disabled={busy || !auth.token}
-                className={`h-10 rounded-full px-5 text-sm font-semibold transition disabled:cursor-not-allowed ${
-                  busy ? "bg-emerald-200/15 text-emerald-50 ring-1 ring-emerald-200/35" : "bg-white text-black hover:bg-emerald-100"
-                }`}
+                className="inline-flex h-11 items-center rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/40"
               >
-                {busy ? "Running..." : run ? "Run agent again" : "Run agent"}
+                {busy ? "Running…" : run ? "Run again" : "Run agent"}
               </button>
             </div>
           </div>
-          <p className="mt-3 text-sm text-white/45">{status}</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <Metric label="Total" value={String(findings.length)} loading={loading} />
             <Metric label="High severity" value={String(summary.high)} loading={loading} />
             <Metric label="Savings range" value={moneyRange(summary.savingsLow, summary.savingsHigh)} loading={loading} />
           </div>
-          <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_160px_170px_150px]">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search duty, type, narrative"
-              className="h-10 rounded-md border border-white/10 bg-black/30 px-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-emerald-200/50"
-            />
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-5 shadow-2xl shadow-black/40 sm:p-6">
+          <div className="grid gap-3 lg:grid-cols-[1fr_160px_170px_150px]">
+            <label className="grid gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">Search</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Duty, type, narrative…"
+                className="h-11 rounded-xl border border-white/10 bg-black/30 px-3.5 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-emerald-200/45 focus:bg-black/40"
+              />
+            </label>
             <SelectControl label="Severity" value={severity} onChange={setSeverity} options={["all", "high", "medium", "low"]} />
             <SelectControl
               label="Lifecycle"
@@ -300,15 +310,18 @@ export default function FindingsPage() {
             <SelectControl label="Sort" value={sort} onChange={setSort} options={["newest", "savings", "severity"]} />
           </div>
           {configs.length ? (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
+                Duties
+              </span>
               {configs.map((config) => (
                 <button
                   key={config.duty}
                   onClick={() => void toggleDuty(config.duty, !config.enabled)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                     config.enabled
-                      ? "border-emerald-200/25 bg-emerald-200/10 text-emerald-50"
-                      : "border-white/10 bg-black/30 text-white/45"
+                      ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                      : "border-white/10 bg-black/30 text-white/45 hover:bg-white/[0.05]"
                   }`}
                 >
                   {titleize(config.duty)}
@@ -316,12 +329,13 @@ export default function FindingsPage() {
               ))}
             </div>
           ) : null}
-        </div>
+        </section>
 
         <div className="grid gap-5 xl:grid-cols-[440px_minmax(0,1fr)]">
-          <section className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30">
-            <div className="border-b border-white/10 bg-black/25 px-4 py-3">
-              <h2 className="text-sm font-semibold">Finding queue</h2>
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40">
+            <div className="border-b border-white/10 bg-black/30 px-5 py-4">
+              <h2 className="text-sm font-semibold text-white">Finding queue</h2>
+              <p className="mt-0.5 text-xs text-white/45">Click a row to inspect</p>
             </div>
             <div className="max-h-[calc(100vh-290px)] min-h-96 overflow-auto p-2">
               {loading ? <FindingListSkeleton /> : null}
@@ -362,12 +376,12 @@ export default function FindingsPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30">
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/40">
             {loading ? (
               <FindingDetailSkeleton />
             ) : active ? (
               <article>
-                <div className="border-b border-white/10 bg-black/25 p-5">
+                <div className="border-b border-white/10 bg-black/30 p-5">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -421,9 +435,11 @@ export default function FindingsPage() {
                   </div>
                 ) : null}
                 <div className="grid gap-4 p-5 lg:grid-cols-2">
+                  <div className="lg:col-span-2">
+                    <ActionPanel action={active.proposed_action as ProposedAction} />
+                  </div>
                   <CodePanel title="Evidence row IDs" value={active.evidence_row_ids} />
-                  <CodePanel title="Dedupe fingerprint" value={active.fingerprint || "pending"} />
-                  <ActionPanel action={active.proposed_action as ProposedAction} />
+                  <FingerprintPanel fingerprint={active.fingerprint} />
                 </div>
               </article>
             ) : (
@@ -440,9 +456,13 @@ export default function FindingsPage() {
 
 function Metric({ label, value, loading = false }: { label: string; value: string; loading?: boolean }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.055] p-4">
-      <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/35">{label}</p>
-      {loading ? <SkeletonLine className="mt-2 h-7 w-28" /> : <p className="mt-2 min-h-7 text-lg font-semibold text-white">{value}</p>}
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">{label}</p>
+      {loading ? (
+        <SkeletonLine className="mt-3 h-8 w-28" />
+      ) : (
+        <p className="mt-3 min-h-8 text-2xl font-semibold tracking-[-0.02em] text-white">{value}</p>
+      )}
     </div>
   );
 }
@@ -512,12 +532,12 @@ function SelectControl({
   options: string[];
 }) {
   return (
-    <label className="grid gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">{label}</span>
+    <label className="grid gap-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-md border border-white/10 bg-black/30 px-3 text-sm text-white outline-none transition focus:border-emerald-200/50"
+        className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white outline-none transition focus:border-emerald-200/45 focus:bg-black/40"
       >
         {options.map((option) => (
           <option key={option} value={option} className="bg-black text-white">
@@ -534,6 +554,28 @@ function CodePanel({ title, value }: { title: string; value: unknown }) {
     <div className="rounded-md border border-white/10 bg-black/25">
       <div className="border-b border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/35">{title}</div>
       <pre className="max-h-72 overflow-auto p-3 text-xs leading-5 text-white/62">{JSON.stringify(value, null, 2)}</pre>
+    </div>
+  );
+}
+
+function FingerprintPanel({ fingerprint }: { fingerprint: string | null }) {
+  const short = fingerprint ? `${fingerprint.slice(0, 12)}…` : "Pending";
+  return (
+    <div className="rounded-md border border-white/10 bg-black/25">
+      <div className="border-b border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/35">
+        Fingerprint
+      </div>
+      <div className="grid gap-2 p-3">
+        <span
+          className="font-mono text-sm font-semibold text-white"
+          title={fingerprint || "This finding pre-dates the fingerprint feature; re-run the agent to populate."}
+        >
+          {short}
+        </span>
+        <span className="text-xs leading-5 text-white/50">
+          A stable identity for this finding. Re-detections on later runs share the same fingerprint so we can group history and suppress duplicate alerts.
+        </span>
+      </div>
     </div>
   );
 }
