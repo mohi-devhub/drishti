@@ -19,7 +19,7 @@ export function apiBase() {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
-function demoMerchantSwitcherEnabled(authMode: AuthMode) {
+function demoMerchantSwitcherEnabled(authMode: AuthMode | null) {
   return (
     authMode === "demo" ||
     process.env.NEXT_PUBLIC_ENABLE_DEMO_MERCHANT_SWITCHER === "true"
@@ -39,7 +39,12 @@ export function useDemoAuth() {
   const [merchant, setMerchant] = useState<MerchantKey>("merchant_c");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
-  const [authMode, setAuthMode] = useState<AuthMode>("demo");
+
+  const authMode: AuthMode | null = !isLoaded
+    ? null
+    : isSignedIn
+      ? "clerk"
+      : "demo";
 
   const setManualToken = useCallback((value: string) => {
     setToken(value);
@@ -54,7 +59,6 @@ export function useDemoAuth() {
     if (isLoaded && isSignedIn) {
       const template = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || undefined;
       const clerkToken = await getToken(template ? { template } : undefined);
-      setAuthMode("clerk");
       if (clerkToken) {
         setToken(clerkToken);
         localStorage.removeItem("drishti.token");
@@ -70,13 +74,11 @@ export function useDemoAuth() {
       if (!response.ok) throw new Error(await response.text());
       const payload = await response.json();
       setToken(payload.token);
-      setAuthMode("demo");
       localStorage.setItem("drishti.token", payload.token);
     } catch {
       const stored = localStorage.getItem("drishti.token");
       if (stored) {
         setToken(stored);
-        setAuthMode("demo");
         setError("");
       } else {
         setError("Demo auth unavailable. Check the local API and DRISHTI_TEST_JWT_SECRET.");
@@ -107,13 +109,13 @@ function useClerkAuthState(): ReturnType<typeof useAuth> {
 
 export function AppHeader({
   merchant,
-  authMode = "demo",
+  authMode = null,
   onMerchant,
 }: {
   merchant: MerchantKey;
   token: string;
   error: string;
-  authMode?: AuthMode;
+  authMode?: AuthMode | null;
   onMerchant: (merchant: MerchantKey) => void;
 }) {
   const pathname = usePathname();
