@@ -1,6 +1,6 @@
 # Drishti Load Harness Report
 
-Generated at: `2026-05-14T06:10:55.578156+00:00`
+Generated at: `2026-05-16T20:55:58.186508+00:00`
 
 ## Scenario
 
@@ -15,8 +15,8 @@ Generated at: `2026-05-14T06:10:55.578156+00:00`
 
 | Workload | Count | Mean ms | P50 ms | P95 ms | Max ms |
 |---|---:|---:|---:|---:|---:|
-| chat citation turn | 200 | 6.74 | 6.74 | 12.41 | 13.01 |
-| agent deterministic scan | 100 | 0.24 | 0.24 | 0.40 | 0.45 |
+| chat citation turn | 200 | 6.63 | 6.63 | 12.20 | 12.73 |
+| agent deterministic scan | 100 | 0.23 | 0.23 | 0.39 | 0.44 |
 
 ## Interpretation
 
@@ -27,16 +27,16 @@ Generated at: `2026-05-14T06:10:55.578156+00:00`
 
 ## Database Smoke
 
-- Count query duration: `9763.73 ms`
+- Count query duration: `9789.83 ms`
 
 | Table | Rows |
 |---|---:|
 | `merchants` | `3` |
-| `source_records` | `65` |
-| `orders` | `49` |
-| `shipments` | `12` |
-| `payments` | `2` |
-| `agent_runs` | `12` |
-| `agent_findings` | `17` |
-| `chat_messages` | `10` |
-| `tool_calls` | `10` |
+| `source_records` | `12,836` |
+| `orders` | `5,125` |
+| `shipments` | `3,930` |
+| `payments` | `3,772` |
+| `agent_runs` | `31` |
+| `agent_findings` | `229` |
+| `chat_messages` | `68` |
+| `tool_calls` | `86` |
