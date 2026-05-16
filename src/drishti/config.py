@@ -40,6 +40,15 @@ class Settings(BaseSettings):
 
     transport_mode: str = Field(default="mock", alias="DRISHTI_TRANSPORT")
     shopify_webhook_secret: str | None = Field(default=None, alias="SHOPIFY_WEBHOOK_SECRET")
+    shopify_api_key: str | None = Field(default=None, alias="SHOPIFY_API_KEY")
+    shopify_api_secret: str | None = Field(default=None, alias="SHOPIFY_API_SECRET")
+    shopify_scopes: str = Field(
+        default="read_orders,read_customers,read_products",
+        alias="SHOPIFY_SCOPES",
+    )
+    shopify_redirect_uri: str | None = Field(default=None, alias="SHOPIFY_REDIRECT_URI")
+    shiprocket_webhook_secret: str | None = Field(default=None, alias="SHIPROCKET_WEBHOOK_SECRET")
+    razorpay_webhook_secret: str | None = Field(default=None, alias="RAZORPAY_WEBHOOK_SECRET")
 
     @model_validator(mode="after")
     def validate_environment(self) -> "Settings":

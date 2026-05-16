@@ -8,7 +8,12 @@ from drishti.db.repositories.auth import resolve_merchant_for_clerk_context
 from drishti.db.session import set_merchant_context
 
 PUBLIC_PATHS = {"/health", "/health/live", "/health/ready", "/docs", "/openapi.json", "/redoc"}
-PUBLIC_PREFIXES = ("/webhooks/shopify/", "/demo/token/")
+PUBLIC_PREFIXES = (
+    "/webhooks/shopify/",
+    "/webhooks/shiprocket/",
+    "/webhooks/razorpay",
+    "/demo/token/",
+)
 
 
 class MerchantScopeMiddleware(BaseHTTPMiddleware):
