@@ -67,11 +67,12 @@ export default function DashboardPage() {
   const [composer, setComposer] = useState("");
 
   const loadFindings = useCallback(async (): Promise<boolean> => {
-    if (!auth.token) return false;
+    const token = await auth.getFreshToken();
+    if (!token) return false;
     setLoading(true);
     try {
       const response = await fetch(`${apiBase()}/api/findings`, {
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
@@ -86,17 +87,18 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [auth.token]);
+  }, [auth]);
 
   async function runAgent() {
-    if (!auth.token) return;
+    const token = await auth.getFreshToken();
+    if (!token) return;
     setBusy(true);
     try {
       const response = await fetch(
         `${apiBase()}/agents/rto_shipping_margin/runs`,
         {
           method: "POST",
-          headers: authHeaders(auth.token),
+          headers: authHeaders(token),
         },
       );
       const payload = await response.json();
@@ -113,9 +115,10 @@ export default function DashboardPage() {
 
   async function pollAgentRun(runId: string): Promise<AgentRunResponse> {
     for (let attempt = 0; attempt < 60; attempt += 1) {
+      const token = await auth.getFreshToken();
       const response = await fetch(
         `${apiBase()}/agents/rto_shipping_margin/runs/${runId}`,
-        { headers: authHeaders(auth.token) },
+        { headers: authHeaders(token) },
       );
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));

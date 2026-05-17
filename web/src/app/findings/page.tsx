@@ -66,14 +66,15 @@ export default function FindingsPage() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (): Promise<boolean> => {
-    if (!auth.token) return false;
+    const token = await auth.getFreshToken();
+    if (!token) return false;
     setLoading(true);
     try {
       const params = new URLSearchParams({ sort });
       if (severity !== "all") params.set("severity", severity);
       if (lifecycle !== "all") params.set("lifecycle_status", lifecycle);
       if (query.trim()) params.set("q", query.trim());
-      const response = await fetch(`${apiBase()}/api/findings?${params.toString()}`, { headers: authHeaders(auth.token) });
+      const response = await fetch(`${apiBase()}/api/findings?${params.toString()}`, { headers: authHeaders(token) });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
       setFindings(payload.findings || []);
@@ -91,16 +92,17 @@ export default function FindingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [auth.token, lifecycle, query, severity, sort]);
+  }, [auth, lifecycle, query, severity, sort]);
 
   const loadConfigs = useCallback(async () => {
-    if (!auth.token) return;
+    const token = await auth.getFreshToken();
+    if (!token) return;
     const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/duty-configs`, {
-      headers: authHeaders(auth.token),
+      headers: authHeaders(token),
     });
     const payload = await response.json();
     if (response.ok) setConfigs(payload.configs || []);
-  }, [auth.token]);
+  }, [auth]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -114,9 +116,10 @@ export default function FindingsPage() {
     setBusy(true);
     setStatus("Running");
     try {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/runs`, {
         method: "POST",
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
@@ -139,9 +142,10 @@ export default function FindingsPage() {
     if (!run || !["queued", "running"].includes(run.status)) return;
     setBusy(true);
     try {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/runs/${run.id}/cancel`, {
         method: "POST",
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
@@ -156,9 +160,10 @@ export default function FindingsPage() {
   }
 
   async function updateLifecycle(findingId: string, lifecycleStatus: string) {
+    const token = await auth.getFreshToken();
     const response = await fetch(`${apiBase()}/api/findings/${findingId}`, {
       method: "PATCH",
-      headers: jsonHeaders(auth.token),
+      headers: jsonHeaders(token),
       body: JSON.stringify({ lifecycle_status: lifecycleStatus }),
     });
     const payload = await response.json();
@@ -169,9 +174,10 @@ export default function FindingsPage() {
   }
 
   async function toggleDuty(duty: string, enabled: boolean) {
+    const token = await auth.getFreshToken();
     const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/duty-configs/${duty}`, {
       method: "PATCH",
-      headers: jsonHeaders(auth.token),
+      headers: jsonHeaders(token),
       body: JSON.stringify({ enabled, config: {} }),
     });
     const payload = await response.json();
@@ -199,8 +205,9 @@ export default function FindingsPage() {
 
   async function pollAgentRun(runId: string): Promise<AgentRunResponse> {
     for (let attempt = 0; attempt < 60; attempt += 1) {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/agents/rto_shipping_margin/runs/${runId}`, {
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));

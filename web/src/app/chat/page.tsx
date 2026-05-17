@@ -69,11 +69,12 @@ function ChatWorkspace() {
   }, [params]);
 
   const loadSessions = useCallback(async () => {
-    if (!auth.token) return;
+    const token = await auth.getFreshToken();
+    if (!token) return;
     setSessionsLoading(true);
     try {
       const response = await fetch(`${apiBase()}/chat/sessions`, {
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
@@ -83,7 +84,7 @@ function ChatWorkspace() {
     } finally {
       setSessionsLoading(false);
     }
-  }, [auth.token]);
+  }, [auth]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -111,17 +112,19 @@ function ChatWorkspace() {
 
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!input.trim() || !auth.token) return;
+    if (!input.trim()) return;
+    const token = await auth.getFreshToken();
+    if (!token) return;
     const question = input.trim();
     setBusy(true);
     setMessages((current) => [...current, { role: "user", content: question }]);
     setInput("");
     try {
-      const streamed = await sendStream(question);
+      const streamed = await sendStream(question, token);
       if (streamed) return;
       const response = await fetch(`${apiBase()}/chat`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...authHeaders(auth.token) },
+        headers: { "content-type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({ message: question, session_id: sessionId }),
       });
       const payload = await response.json();
@@ -173,11 +176,12 @@ function ChatWorkspace() {
   }
 
   async function loadSession(id: string) {
-    if (!auth.token) return;
+    const token = await auth.getFreshToken();
+    if (!token) return;
     setBusy(true);
     try {
       const response = await fetch(`${apiBase()}/chat/sessions/${id}`, {
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
@@ -204,10 +208,10 @@ function ChatWorkspace() {
     }
   }
 
-  async function sendStream(question: string) {
+  async function sendStream(question: string, token: string) {
     const response = await fetch(`${apiBase()}/chat/stream`, {
       method: "POST",
-      headers: { "content-type": "application/json", ...authHeaders(auth.token) },
+      headers: { "content-type": "application/json", ...authHeaders(token) },
       body: JSON.stringify({ message: question, session_id: sessionId }),
     });
     if (!response.ok || !response.body) return false;
@@ -268,8 +272,9 @@ function ChatWorkspace() {
       return;
     }
     try {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/api/source_records/${row.raw_record_id}`, {
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const text = await response.text();
       const payload = text ? JSON.parse(text) : {};

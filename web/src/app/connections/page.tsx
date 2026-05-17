@@ -39,11 +39,12 @@ export default function ConnectionsPage() {
   });
 
   const load = useCallback(async () => {
-    if (!auth.token) return;
+    const token = await auth.getFreshToken();
+    if (!token) return;
     setStatus("Loading");
     try {
       const response = await fetch(`${apiBase()}/connections`, {
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(payload));
@@ -53,7 +54,7 @@ export default function ConnectionsPage() {
       console.error(error);
       setStatus("Connections API unavailable");
     }
-  }, [auth.token]);
+  }, [auth]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -69,9 +70,10 @@ export default function ConnectionsPage() {
   async function startShopify(event: FormEvent) {
     event.preventDefault();
     await submit("shopify", async () => {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/connections/shopify/start`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...authHeaders(auth.token) },
+        headers: { "content-type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({ shop: forms.shopifyShop }),
       });
       const payload = await response.json();
@@ -83,9 +85,10 @@ export default function ConnectionsPage() {
   async function connectShiprocket(event: FormEvent) {
     event.preventDefault();
     await submit("shiprocket", async () => {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/connections/shiprocket`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...authHeaders(auth.token) },
+        headers: { "content-type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({
           email: forms.shiprocketEmail,
           password: forms.shiprocketPassword,
@@ -102,9 +105,10 @@ export default function ConnectionsPage() {
   async function connectRazorpay(event: FormEvent) {
     event.preventDefault();
     await submit("razorpay", async () => {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/connections/razorpay`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...authHeaders(auth.token) },
+        headers: { "content-type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({
           key_id: forms.razorpayKeyId,
           key_secret: forms.razorpayKeySecret,
@@ -119,9 +123,10 @@ export default function ConnectionsPage() {
 
   async function revoke(source: Connection["source"]) {
     await submit(source, async () => {
+      const token = await auth.getFreshToken();
       const response = await fetch(`${apiBase()}/connections/${source}`, {
         method: "DELETE",
-        headers: authHeaders(auth.token),
+        headers: authHeaders(token),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || JSON.stringify(payload));
