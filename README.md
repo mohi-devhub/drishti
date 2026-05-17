@@ -4,6 +4,8 @@
 
 > A v0 built against the Build brief: three connectors, a universal schema, a chat layer with a citation contract, and an autonomous agent. Submitted Sunday, 17 May 2026.
 
+**Live demo**: [drishti-zeta.vercel.app](https://drishti-zeta.vercel.app) — sign in with any email or Google. Every signed-in account lands on the seeded **Merchant C** tenant (the [Auth / tenancy](#eval--where-it-breaks) section explains why; it's an intentional demo affordance, not a production tenancy model).
+
 ---
 
 ## What I built — 5-line architecture summary
@@ -16,7 +18,7 @@
 
 ### What's actually wired up
 
-- 1 backend service (FastAPI, 54 pytest tests, ruff clean)
+- 1 backend service (FastAPI, 61 pytest tests, ruff clean)
 - 1 arq worker (15 job functions across sync / normalize / agent / cron)
 - 17 alembic migrations covering 22 tables with RLS on all tenant-scoped tables
 - 3 connector implementations, 9 syncer resources (Shopify orders/customers/products, Shiprocket shipments/tracking, Razorpay payments/refunds/settlements + 2 helpers)
@@ -279,6 +281,7 @@ I'd rather call these out than have them found.
 - `source_records` is not yet partitioned. Below ~10M rows the cost is hypothetical.
 - No aggregate rollup tables. Chat tools recompute from raw on every call.
 - Load harness is synthetic + a DB smoke count; not a real 10k-merchant soak.
+- The arq worker can hang for one job on a stale asyncpg connection past Supabase pgBouncer's idle window — the next pool checkout sits waiting on a server-side-recycled socket. arq's 300s job timeout catches it and the subsequent run uses a fresh connection. Setting `pool_recycle` shorter than pgBouncer's idle timeout would fix it cleanly; not done in this v0.
 
 **Frontend**
 - Chat history supports auto-save, click-to-load, delete, and timestamps. Rename, search, regenerate, and export are not built.
@@ -289,7 +292,7 @@ I'd rather call these out than have them found.
 
 ## Hours spent
 
-Approximate: **40–50 hours across 7 distinct working days** (10–17 May 2026, with a 1-day gap around the 15th).
+Approximate: **45–55 hours across 7 distinct working days** (10–17 May 2026, with a 1-day gap around the 15th). The last working day added ~5 hours of live-deploy debugging that wasn't planned for.
 
 Rough split:
 
@@ -301,7 +304,7 @@ Rough split:
 | Agent base + 4 duties + narrator + citation validation for findings | 7 |
 | Chat tools + OpenAI tool-loop + citation validator | 7 |
 | Frontend (landing, dashboard, chat, findings, connections, Clerk wiring) | 8 |
-| Load harness, README, polish, debugging the pgBouncer + CORS issues | 5 |
+| Load harness, README, polish, live deploy on Vercel + Railway + Supabase + Upstash + Clerk (Nixpacks venv quirks, JWT lifecycle, CORS, idle-connection debugging) | 8 |
 
 ---
 
@@ -370,7 +373,7 @@ src/drishti/
 alembic/versions/             # 17 migrations
 web/src/app/                  # Next.js App Router
 scripts/                      # seed_demo, load_harness, seed_agent_demo
-tests/                        # 54 pytest tests
+tests/                        # 61 pytest tests
 ```
 
 ---
@@ -402,7 +405,45 @@ uv run python scripts/load_harness.py \
 Checks:
 
 ```bash
-uv run pytest             # 54 tests
+uv run pytest             # 61 tests
 uv run ruff check .
 cd web && corepack pnpm lint
 ```
+
+---
+
+## Deployment
+
+The live v0 runs across five free-tier services:
+
+| Service | Region | What it hosts |
+|---|---|---|
+| **Vercel** | Global edge | Next.js frontend (`web/`) at `drishti-zeta.vercel.app` |
+| **Railway** | `europe-west4` | FastAPI API (`drishti.app:create_app`) + arq worker (`drishti.worker.WorkerSettings`) — two services, same repo |
+| **Supabase** | `ap-northeast-1` (Tokyo) | Postgres via the transaction pooler (asyncpg, prepared-statement cache disabled) — all 17 migrations applied |
+| **Upstash** | `ap-northeast-1` (Tokyo) | Redis with TLS (`rediss://`) — arq job queue |
+| **Clerk** | Global | Auth, JWT issuance with a `drishti` template that emits a hardcoded `merchant_id` claim. Dev mode for this demo. |
+| **OpenAI** | — | `gpt-5.2` for chat tool-loop + agent narrator |
+
+Total cost so far: $0. Estimated steady-state at single-merchant demo traffic: ~$5–10/month, mostly OpenAI.
+
+**API start command** (Railway):
+
+```
+if [ -x /app/.venv/bin/alembic ]; then VENV=/app/.venv; else VENV=/opt/venv; fi && \
+  $VENV/bin/alembic upgrade head && \
+  exec $VENV/bin/uvicorn drishti.app:create_app --factory --host 0.0.0.0 --port $PORT
+```
+
+**Worker start command** (Railway):
+
+```
+if [ -x /app/.venv/bin/arq ]; then exec /app/.venv/bin/arq drishti.worker.WorkerSettings;
+  else exec /opt/venv/bin/arq drishti.worker.WorkerSettings; fi
+```
+
+The conditional venv path is bulletproof against Nixpacks' Python provider occasionally choosing `/opt/venv` over `/app/.venv` for the synced environment.
+
+**CORS** is gated by `DRISHTI_WEB_ORIGIN` on the API. Set it to the canonical Vercel domain — preview deployment URLs are intentionally outside the allowlist.
+
+**Auth flow on the live demo**: Clerk issues a JWT with the `drishti` template, which carries `merchant_id` and `aud: drishti-api` as literal claims. The API's `ClerkJWTVerifier` validates `iss` against the Clerk Frontend API URL, `aud` against `CLERK_JWT_AUDIENCE`, signature via JWKS, and extracts `merchant_id` directly from claims for any authenticated user. There is no per-user `clerk_user_merchants` mapping for the demo (the table exists but isn't required on this path).
