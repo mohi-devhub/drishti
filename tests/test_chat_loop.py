@@ -1,9 +1,65 @@
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import UUID
+
+import pytest
+
 from drishti.chat.citation_validator import validate_citations
-from drishti.chat.loop import _answer_for, _coerce_tool_args, _db_validation_status, _select_tools
-from drishti.chat.tools.registry import CitedAggregate, CitedRow, ToolResult
+from drishti.chat.loop import (
+    _answer_for,
+    _coerce_tool_args,
+    _db_validation_status,
+    _openai_tool_schemas,
+    _select_tools,
+)
+from drishti.chat.tools.registry import (
+    CitedAggregate,
+    CitedRow,
+    ToolResult,
+    update_duty_config,
+    update_finding_status,
+)
 from drishti.routes.chat import _answer_chunks, _sse
+
+
+MERCHANT_ID = UUID("00000000-0000-0000-0000-00000000000a")
+FINDING_ID = UUID("00000000-0000-0000-0000-0000000000f1")
+
+
+class _Mapping:
+    def __init__(self, row: dict | None) -> None:
+        self._row = row
+
+    def one_or_none(self):
+        return self._row
+
+    def one(self):
+        assert self._row is not None
+        return self._row
+
+
+class _Result:
+    def __init__(self, row: dict | None) -> None:
+        self._row = row
+
+    def mappings(self):
+        return _Mapping(self._row)
+
+
+class _FakeSession:
+    def __init__(self, rows: list[dict | None]) -> None:
+        self._rows = list(rows)
+        self.executed: list[tuple[str, dict]] = []
+        self.commits = 0
+
+    async def execute(self, statement, params):
+        self.executed.append((str(statement), params))
+        row = self._rows.pop(0) if self._rows else None
+        return _Result(row)
+
+    async def commit(self):
+        self.commits += 1
 
 
 def test_chat_selects_cross_source_tools_for_shipping_loss_question() -> None:
@@ -130,3 +186,138 @@ def test_sse_helpers_emit_event_frames_and_answer_chunks() -> None:
     assert frame.startswith("event: delta\n")
     assert 'data: {"text": "hello"}' in frame
     assert "".join(chunks).replace("  ", " ").strip() == "one two three four five six seven eight nine ten"
+
+
+@pytest.mark.asyncio
+async def test_update_finding_status_returns_updated_row_and_commits() -> None:
+    session = _FakeSession(
+        rows=[
+            {
+                "id": FINDING_ID,
+                "duty": "cod_rto_risk",
+                "finding_type": "cod_rto_cluster",
+                "severity": "high",
+                "lifecycle_status": "acknowledged",
+                "confidence": 0.92,
+                "estimated_saving_inr_low": 1000,
+                "estimated_saving_inr_high": 4000,
+            }
+        ]
+    )
+
+    result = await update_finding_status(
+        session,
+        merchant_id=MERCHANT_ID,
+        finding_id=FINDING_ID,
+        lifecycle_status="acknowledged",
+    )
+
+    assert result.tool_name == "update_finding_status"
+    assert result.metadata["status"] == "updated"
+    assert len(result.rows) == 1
+    row = result.rows[0]
+    assert row.row_id == f"finding:{FINDING_ID}"
+    assert row.values["lifecycle_status"] == "acknowledged"
+    assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_update_finding_status_rejects_unknown_lifecycle_status() -> None:
+    session = _FakeSession(rows=[])
+
+    result = await update_finding_status(
+        session,
+        merchant_id=MERCHANT_ID,
+        finding_id=FINDING_ID,
+        lifecycle_status="archived",
+    )
+
+    assert result.metadata["status"] == "rejected"
+    assert result.rows == []
+    assert session.executed == []
+    assert session.commits == 0
+
+
+@pytest.mark.asyncio
+async def test_update_finding_status_marks_not_found_when_row_missing() -> None:
+    session = _FakeSession(rows=[None])
+
+    result = await update_finding_status(
+        session,
+        merchant_id=MERCHANT_ID,
+        finding_id=FINDING_ID,
+        lifecycle_status="dismissed",
+    )
+
+    assert result.metadata["status"] == "not_found"
+    assert result.rows == []
+    assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_update_duty_config_returns_updated_row_and_commits() -> None:
+    session = _FakeSession(
+        rows=[
+            {
+                "duty": "delayed_prepaid",
+                "enabled": False,
+                "config": {},
+                "updated_at": datetime(2026, 5, 17, 12, 0, 0),
+            }
+        ]
+    )
+
+    result = await update_duty_config(
+        session,
+        merchant_id=MERCHANT_ID,
+        duty="delayed_prepaid",
+        enabled=False,
+    )
+
+    assert result.tool_name == "update_duty_config"
+    assert result.metadata["status"] == "updated"
+    assert len(result.rows) == 1
+    assert result.rows[0].values["enabled"] is False
+    assert result.rows[0].values["duty"] == "delayed_prepaid"
+    assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_update_duty_config_rejects_unknown_duty() -> None:
+    session = _FakeSession(rows=[])
+
+    result = await update_duty_config(
+        session,
+        merchant_id=MERCHANT_ID,
+        duty="invent_a_duty",
+        enabled=True,
+    )
+
+    assert result.metadata["status"] == "rejected"
+    assert result.rows == []
+    assert session.executed == []
+    assert session.commits == 0
+
+
+def test_openai_schemas_expose_write_tools() -> None:
+    names = {schema["name"] for schema in _openai_tool_schemas()}
+
+    assert "update_finding_status" in names
+    assert "update_duty_config" in names
+
+
+def test_coerce_tool_args_handles_write_tools() -> None:
+    finding_args = _coerce_tool_args(
+        "update_finding_status",
+        {
+            "finding_id": "00000000-0000-0000-0000-0000000000f1",
+            "lifecycle_status": "Dismissed",
+        },
+    )
+    duty_args = _coerce_tool_args(
+        "update_duty_config", {"duty": "delayed_prepaid", "enabled": "true"}
+    )
+
+    assert isinstance(finding_args["finding_id"], UUID)
+    assert finding_args["lifecycle_status"] == "dismissed"
+    assert duty_args == {"duty": "delayed_prepaid", "enabled": True}

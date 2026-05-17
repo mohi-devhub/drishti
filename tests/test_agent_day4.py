@@ -43,8 +43,8 @@ def test_worker_settings_declares_agent_cron() -> None:
     assert any(job.name == "enqueue_daily_agent_runs" for job in WorkerSettings.cron_jobs)
 
 
-def test_day4_chat_tools_are_read_only() -> None:
-    expected = {
+def test_chat_tool_registry_splits_read_and_write() -> None:
+    read_only = {
         "query_orders",
         "rto_loss_by_pincode",
         "query_shipments",
@@ -55,9 +55,13 @@ def test_day4_chat_tools_are_read_only() -> None:
         "list_findings",
         "get_finding",
     }
+    write_tools = {"update_finding_status", "update_duty_config"}
 
-    assert set(TOOL_REGISTRY) == expected
-    assert all(tool.read_only for tool in TOOL_REGISTRY.values())
+    assert set(TOOL_REGISTRY) == read_only | write_tools
+    for name in read_only:
+        assert TOOL_REGISTRY[name].read_only is True
+    for name in write_tools:
+        assert TOOL_REGISTRY[name].read_only is False
 
 
 def test_shopify_webhook_hmac_validation() -> None:
