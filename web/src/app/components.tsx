@@ -5,7 +5,7 @@ import { Eye } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type MerchantKey = "merchant_a" | "merchant_b" | "merchant_c";
 
@@ -39,6 +39,11 @@ export function useDemoAuth() {
   const [merchant, setMerchant] = useState<MerchantKey>("merchant_c");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const tokenRef = useRef("");
+
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   const authMode: AuthMode | null = !isLoaded
     ? null
@@ -47,6 +52,7 @@ export function useDemoAuth() {
       : "demo";
 
   const setManualToken = useCallback((value: string) => {
+    tokenRef.current = value;
     setToken(value);
     localStorage.setItem("drishti.token", value);
   }, []);
@@ -56,12 +62,15 @@ export function useDemoAuth() {
       const template = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || undefined;
       const fresh = await getToken(template ? { template } : undefined);
       if (fresh) {
-        setToken(fresh);
+        if (fresh !== tokenRef.current) {
+          tokenRef.current = fresh;
+          setToken(fresh);
+        }
         return fresh;
       }
     }
-    return token;
-  }, [getToken, isLoaded, isSignedIn, token]);
+    return tokenRef.current;
+  }, [getToken, isLoaded, isSignedIn]);
 
   const refresh = useCallback(async (nextMerchant: MerchantKey = "merchant_c") => {
     setError("");

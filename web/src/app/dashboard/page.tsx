@@ -87,7 +87,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [auth]);
+  }, [auth.getFreshToken]);
 
   async function runAgent() {
     const token = await auth.getFreshToken();

@@ -54,7 +54,7 @@ export default function ConnectionsPage() {
       console.error(error);
       setStatus("Connections API unavailable");
     }
-  }, [auth]);
+  }, [auth.getFreshToken]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

@@ -92,7 +92,7 @@ export default function FindingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [auth, lifecycle, query, severity, sort]);
+  }, [auth.getFreshToken, lifecycle, query, severity, sort]);
 
   const loadConfigs = useCallback(async () => {
     const token = await auth.getFreshToken();
@@ -102,7 +102,7 @@ export default function FindingsPage() {
     });
     const payload = await response.json();
     if (response.ok) setConfigs(payload.configs || []);
-  }, [auth]);
+  }, [auth.getFreshToken]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

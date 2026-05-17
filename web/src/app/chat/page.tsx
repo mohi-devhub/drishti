@@ -84,7 +84,7 @@ function ChatWorkspace() {
     } finally {
       setSessionsLoading(false);
     }
-  }, [auth]);
+  }, [auth.getFreshToken]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
