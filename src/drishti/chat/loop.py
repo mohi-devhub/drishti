@@ -180,7 +180,12 @@ async def _openai_tool_draft(
                 "Resolve relative date phrases like 'this month' against that date. "
                 "Answer using the provided tools. Every numeric value in your final answer "
                 "must be copied from a tool result and wrapped as <cite id>number</cite>. "
-                "Do not invent arithmetic or cite IDs. If a number is unavailable, omit it."
+                "Do not invent arithmetic or cite IDs. If a number is unavailable, omit it. "
+                "Most tools are read-only. Two tools mutate state: "
+                "update_finding_status (acknowledge/dismiss/action/reopen a finding) and "
+                "update_duty_config (enable/disable an agent duty). "
+                "Only call these write tools when the user explicitly asks for that mutation "
+                "and supplies enough specifics to identify the row."
             ),
         },
         {"role": "user", "content": message},
@@ -342,6 +347,45 @@ def _openai_tool_schemas() -> list[dict[str, Any]]:
                 "additionalProperties": False,
             },
         },
+        {
+            "type": "function",
+            "name": "update_finding_status",
+            "description": TOOL_REGISTRY["update_finding_status"].description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "finding_id": {"type": "string", "format": "uuid"},
+                    "lifecycle_status": {
+                        "type": "string",
+                        "enum": ["open", "acknowledged", "actioned", "dismissed"],
+                    },
+                },
+                "required": ["finding_id", "lifecycle_status"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
+            "name": "update_duty_config",
+            "description": TOOL_REGISTRY["update_duty_config"].description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "duty": {
+                        "type": "string",
+                        "enum": [
+                            "cod_rto_risk",
+                            "courier_margin_drift",
+                            "delayed_prepaid",
+                            "refund_shipping_mismatch",
+                        ],
+                    },
+                    "enabled": {"type": "boolean"},
+                },
+                "required": ["duty", "enabled"],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -412,6 +456,8 @@ def _coerce_tool_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
         "query_shipments": {"status", "courier_id", "limit"},
         "query_payments": {"status", "limit"},
         "get_finding": {"finding_id"},
+        "update_finding_status": {"finding_id", "lifecycle_status"},
+        "update_duty_config": {"duty", "enabled"},
     }.get(name, {"limit"})
     coerced = {key: value for key, value in args.items() if key in allowed and value is not None}
     if "limit" in coerced:
@@ -427,6 +473,13 @@ def _coerce_tool_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
             coerced[key] = date.fromisoformat(coerced[key])
     if name == "get_finding" and "finding_id" in coerced:
         coerced["finding_id"] = UUID(str(coerced["finding_id"]))
+    if name == "update_finding_status":
+        if "finding_id" in coerced:
+            coerced["finding_id"] = UUID(str(coerced["finding_id"]))
+        if "lifecycle_status" in coerced:
+            coerced["lifecycle_status"] = str(coerced["lifecycle_status"]).lower()
+    if name == "update_duty_config" and "enabled" in coerced:
+        coerced["enabled"] = bool(coerced["enabled"])
     return coerced
 
 

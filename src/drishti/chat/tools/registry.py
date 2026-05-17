@@ -10,6 +10,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from drishti.db.repositories import agent_runs as agent_runs_repo
+
+LIFECYCLE_STATUSES = {"open", "acknowledged", "actioned", "dismissed"}
+KNOWN_DUTIES = {
+    "cod_rto_risk",
+    "courier_margin_drift",
+    "delayed_prepaid",
+    "refund_shipping_mismatch",
+}
+
 
 class CitedRow(BaseModel):
     row_id: str
@@ -558,6 +568,117 @@ async def get_finding(
     )
 
 
+async def update_finding_status(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    finding_id: UUID,
+    lifecycle_status: str,
+) -> ToolResult:
+    args = {"finding_id": str(finding_id), "lifecycle_status": lifecycle_status}
+    if lifecycle_status not in LIFECYCLE_STATUSES:
+        return ToolResult(
+            result_id=_result_id(),
+            tool_name="update_finding_status",
+            args=args,
+            rows=[],
+            aggregates=[],
+            metadata={
+                "status": "rejected",
+                "reason": f"lifecycle_status must be one of {sorted(LIFECYCLE_STATUSES)}",
+            },
+        )
+    row = await agent_runs_repo.update_finding_lifecycle(
+        session,
+        merchant_id=merchant_id,
+        finding_id=finding_id,
+        lifecycle_status=lifecycle_status,
+    )
+    await session.commit()
+    if row is None:
+        return ToolResult(
+            result_id=_result_id(),
+            tool_name="update_finding_status",
+            args=args,
+            rows=[],
+            aggregates=[],
+            metadata={"status": "not_found"},
+        )
+    rows = [
+        _derived_row(
+            row_id=f"finding:{row['id']}",
+            values={
+                "id": str(row["id"]),
+                "duty": row["duty"],
+                "finding_type": row["finding_type"],
+                "severity": row["severity"],
+                "lifecycle_status": row["lifecycle_status"],
+                "estimated_saving_inr_low": row["estimated_saving_inr_low"],
+                "estimated_saving_inr_high": row["estimated_saving_inr_high"],
+                "confidence": float(row["confidence"]) if row["confidence"] is not None else None,
+            },
+            fetched_from="agent_findings (UPDATE lifecycle_status)",
+        )
+    ]
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="update_finding_status",
+        args=args,
+        rows=rows,
+        aggregates=[],
+        metadata={"status": "updated", "previous_lifecycle_status": None},
+    )
+
+
+async def update_duty_config(
+    session: AsyncSession,
+    *,
+    merchant_id: UUID,
+    duty: str,
+    enabled: bool,
+) -> ToolResult:
+    args: dict[str, Any] = {"duty": duty, "enabled": enabled}
+    if duty not in KNOWN_DUTIES:
+        return ToolResult(
+            result_id=_result_id(),
+            tool_name="update_duty_config",
+            args=args,
+            rows=[],
+            aggregates=[],
+            metadata={
+                "status": "rejected",
+                "reason": f"duty must be one of {sorted(KNOWN_DUTIES)}",
+            },
+        )
+    row = await agent_runs_repo.upsert_duty_config(
+        session,
+        merchant_id=merchant_id,
+        duty=duty,
+        enabled=enabled,
+        config=None,
+    )
+    await session.commit()
+    rows = [
+        _derived_row(
+            row_id=f"duty_config:{row['duty']}",
+            values={
+                "duty": row["duty"],
+                "enabled": bool(row["enabled"]),
+                "updated_at": _iso(row["updated_at"]),
+            },
+            fetched_from="agent_duty_configs (UPSERT)",
+        )
+    ]
+    return ToolResult(
+        result_id=_result_id(),
+        tool_name="update_duty_config",
+        args=args,
+        rows=rows,
+        aggregates=[],
+        metadata={"status": "updated"},
+    )
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "query_orders": ToolDefinition(
         name="query_orders",
@@ -603,6 +724,27 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         name="get_finding",
         handler=get_finding,
         description="Get one agent finding.",
+    ),
+    "update_finding_status": ToolDefinition(
+        name="update_finding_status",
+        handler=update_finding_status,
+        read_only=False,
+        description=(
+            "Update the lifecycle status of one agent finding. "
+            "Allowed statuses: open, acknowledged, actioned, dismissed. "
+            "Call only when the user explicitly asks to acknowledge, dismiss, mark actioned, "
+            "or reopen a specific finding (must supply finding_id)."
+        ),
+    ),
+    "update_duty_config": ToolDefinition(
+        name="update_duty_config",
+        handler=update_duty_config,
+        read_only=False,
+        description=(
+            "Enable or disable one agent duty for the current merchant. "
+            "Duties: cod_rto_risk, courier_margin_drift, delayed_prepaid, refund_shipping_mismatch. "
+            "Call only when the user explicitly asks to turn a duty on or off."
+        ),
     ),
 }
 
