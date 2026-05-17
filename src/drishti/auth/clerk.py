@@ -36,12 +36,25 @@ class ClerkJWTVerifier:
         token = self._extract_bearer_token(authorization)
         claims, auth_mode = await self._decode(token)
         return AuthContext(
-            merchant_id=self._extract_merchant_id(claims) if auth_mode == "demo" else None,
+            merchant_id=self._merchant_id_from_claims(claims, auth_mode),
             clerk_user_id=claims.get("sub"),
             clerk_org_id=self._extract_org_id(claims),
             claims=claims,
             auth_mode=auth_mode,
         )
+
+    def _merchant_id_from_claims(
+        self, claims: dict[str, Any], auth_mode: str
+    ) -> UUID | None:
+        if auth_mode == "demo":
+            return self._extract_merchant_id(claims)
+        raw = claims.get("merchant_id")
+        if not raw:
+            return None
+        try:
+            return UUID(str(raw))
+        except ValueError:
+            return None
 
     def _extract_bearer_token(self, authorization: str | None) -> str:
         if not authorization:
