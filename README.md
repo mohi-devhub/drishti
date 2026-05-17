@@ -11,7 +11,7 @@
 1. FastAPI + Supabase Postgres (asyncpg, RLS-isolated) on the backend, Arq + Redis for sync / normalize / agent jobs, Next.js + Clerk on the web.
 2. Three connectors (Shopify, Shiprocket, Razorpay) sit behind one interface — `Connector` / `ResourceSyncer` / `Transport` / `RateLimiter` — with swappable Live / Mock / Recording transports.
 3. Every payload lands first in append-only `source_records`, then normalizers project it into typed domain tables (`orders`, `shipments`, `payments`, `refunds`, `settlements`, `order_links`) carrying five provenance fields on every row.
-4. Chat uses nine read-only SQL tools called from an OpenAI Responses-API tool loop; a deterministic citation validator rejects any answer that contains an uncited or mismatched number before it reaches the operator.
+4. Chat uses eleven SQL tools — nine read-only plus two write tools that mutate finding lifecycle / duty configs — called from an OpenAI Responses-API tool loop; a deterministic citation validator rejects any answer that contains an uncited or mismatched number before it reaches the operator.
 5. The RTO + Shipping-Margin agent runs four detection duties over the joined data, writes findings with structured proposed actions, and never executes anything against Shopify / Shiprocket / Razorpay.
 
 ### What's actually wired up
@@ -21,7 +21,7 @@
 - 17 alembic migrations covering 22 tables with RLS on all tenant-scoped tables
 - 3 connector implementations, 9 syncer resources (Shopify orders/customers/products, Shiprocket shipments/tracking, Razorpay payments/refunds/settlements + 2 helpers)
 - 1 agent with 4 duties
-- 9 chat tools behind a typed `ToolResult` envelope, called by OpenAI tool-use loop
+- 11 chat tools behind a typed `ToolResult` envelope (9 read-only + 2 write), called by OpenAI tool-use loop
 - 3 webhook routes (Shopify HMAC verified; Shiprocket / Razorpay secret-verified)
 - Next.js app with 5 routes (landing, dashboard, chat, findings, connections) + Clerk auth
 
@@ -133,7 +133,18 @@ ToolResult {
 | `list_findings` | Recent agent findings + count |
 | `get_finding` | Single finding by id, with narrative + proposed action |
 
-**OpenAI is the default in this deployment.** With `OPENAI_API_KEY` set (which it is), every `POST /chat` runs through the OpenAI Responses API tool loop (`src/drishti/chat/loop.py:_openai_tool_draft`). The model sees the nine functions, picks one or more, Drishti executes them server-side under the authenticated merchant, and feeds the typed `ToolResult` back as `function_call_output`. Up to 3 iterations per turn. The model also drafts agent finding narratives (`src/drishti/agents/rto_shipping_margin/narrator.py`).
+### The 2 write tools
+
+These are the only chat surfaces that mutate state. The model is instructed to call them only when the operator explicitly asks for the mutation and supplies enough specifics to identify the row. Every call is persisted in `tool_calls` for audit.
+
+| Tool | What it does | Required args |
+|---|---|---|
+| `update_finding_status` | Sets a finding's lifecycle (`open`, `acknowledged`, `actioned`, `dismissed`). Wraps `agent_findings.lifecycle_status`. | `finding_id`, `lifecycle_status` |
+| `update_duty_config` | Enables or disables one of the four agent duties for the current merchant. Wraps `agent_duty_configs`. | `duty`, `enabled` |
+
+Both return the post-mutation row as a single `CitedRow` so the model can reference the result in its answer. Rejected calls (unknown enum value, missing row) return an empty `rows` list with `metadata.status` set to `rejected` / `not_found`, never silently no-op.
+
+**OpenAI is the default in this deployment.** With `OPENAI_API_KEY` set (which it is), every `POST /chat` runs through the OpenAI Responses API tool loop (`src/drishti/chat/loop.py:_openai_tool_draft`). The model sees all eleven functions, picks one or more, Drishti executes them server-side under the authenticated merchant, and feeds the typed `ToolResult` back as `function_call_output`. Up to 3 iterations per turn. The model also drafts agent finding narratives (`src/drishti/agents/rto_shipping_margin/narrator.py`).
 
 ### The citation contract
 
@@ -150,7 +161,7 @@ ToolResult {
 
 If validation fails after the OpenAI draft, a deterministic answer template runs over the same tool results and is re-validated. If even that fails, the offending `<cite>` blocks are redacted to `[uncited]` before the user sees them. No path lets an uncited number reach the response.
 
-**Honest scope on the fallback path**: if `OPENAI_API_KEY` is unset (or every OpenAI retry fails for a request), chat falls back to keyword-based intent routing over the same 9 tools, then a deterministic answer template. The citation contract is the same gate in both modes. This v0 deployment runs the OpenAI path; the fallback exists so the citation gate is the load-bearing component, not the model.
+**Honest scope on the fallback path**: if `OPENAI_API_KEY` is unset (or every OpenAI retry fails for a request), chat falls back to keyword-based intent routing over the 9 read-only tools, then a deterministic answer template. The two write tools are intentionally unreachable on the fallback path — mutations require explicit operator intent, and keyword routing can't establish that. The citation contract is the same gate in both modes. This v0 deployment runs the OpenAI path; the fallback exists so the citation gate is the load-bearing component, not the model.
 
 ### Streaming
 
@@ -251,7 +262,7 @@ I'd rather call these out than have them found.
 
 **Chat**
 - The OpenAI tool loop caps at 3 tool-call iterations per turn. Deeper investigations get cut off.
-- If OpenAI fails (rate limit, network), the fallback path is keyword-based intent routing over the same 9 tools — good enough to keep the citation contract intact, not a real LLM agent.
+- If OpenAI fails (rate limit, network), the fallback path is keyword-based intent routing over the 9 read-only tools — good enough to keep the citation contract intact, not a real LLM agent. The 2 write tools are deliberately unreachable on this path.
 - The citation validator's regex tokenises numbers via a single `NUMBER_RE` — exotic formats (`1.23e6`, `1,23,000` Indian lakhs grouping) aren't on the whitelist and would either get auto-cited if they collide with a tool value, or get redacted otherwise.
 - Streaming is response chunking, not model-token streaming. Visually the same; latency-wise it's the same as non-streaming.
 
@@ -350,7 +361,7 @@ src/drishti/
 ├── chat/
 │   ├── loop.py               # OpenAI tool loop + deterministic fallback
 │   ├── citation_validator.py # the gate
-│   └── tools/registry.py     # 9 tools, typed envelope
+│   └── tools/registry.py     # 11 tools (9 read + 2 write), typed envelope
 ├── routes/                   # health, chat, agents, findings, connections, webhooks, source_records, merchants, demo
 └── db/
     ├── session.py            # asyncpg engine, RLS context helpers
