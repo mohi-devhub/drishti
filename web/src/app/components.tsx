@@ -107,6 +107,14 @@ export function useDemoAuth() {
     return () => window.clearTimeout(timer);
   }, [isLoaded, refresh]);
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return undefined;
+    const interval = window.setInterval(() => {
+      void getFreshToken();
+    }, 45_000);
+    return () => window.clearInterval(interval);
+  }, [isLoaded, isSignedIn, getFreshToken]);
+
   return { merchant, token, error, authMode, setToken: setManualToken, refresh, getFreshToken, labels };
 }
 
